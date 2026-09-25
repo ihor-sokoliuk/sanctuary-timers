@@ -19,7 +19,7 @@
 2. [x] Preferences/platform: failing tests for normalization, placement, startup decision policy, persistent file roundtrip and transport schema. Implement, pass, add bounded WinHTTP adapter.
 3. [x] Native UI: use tested layout/hit-testing and state decisions; implement no-activate layered panel, icons, contained appearance controls, tray, focus/location notifications, background requests and atomic state persistence.
 4. [x] Package/build: repeatable compiler command, CMake support, Windows CI, icon/version, MIT license, README, user-facing build artifact.
-5. [ ] Verify: full tests, review, isolated integration check, live passive launch, telemetry/resource measurement, exact limitation report. Publish only source/docs/tests to a new public repository.
+5. [x] Verify: full tests, review, isolated integration check, live passive launch, resource measurement, exact limitation report. Publish source/docs/tests and workflow to a new public repository.
 
 ## Review focus
 - Bad or future timestamps must never poison persisted schedule anchors (task 1).
@@ -33,4 +33,6 @@
 - Ruling: use a new source directory under outputs rather than a worktree: this task has no Git repository or existing source. Initialize an isolated new repository there.
 - Ruling: existing projects are design references only; write the small core and UI independently, avoiding inherited unfinished UI and irrelevant features.
 - Core, platform and rendering suites pass before normal launch. Review added regression coverage for changed/exhausted schedule anchors, backward clock changes, request cancellation/deadlines and text widths. Forced Direct2D resource recreation is covered by an offscreen renderer check.
-- A 973,312-byte baseline x64 executable passed an offscreen no-activation smoke check. Initial normal launch preserved the foreground application and registered per-user startup. Live observation and public CI verification are in progress.
+- A 973,312-byte baseline x64 executable passed an offscreen no-activation smoke check. Initial normal launch preserved the foreground application and registered per-user startup.
+- Live observation verified all three feeds, cache writes, focus/DPI changes, single instance, native window styles, and appearance/position changes during the user's own interaction. At 21:55:20 UTC the Helltide boundary triggered exactly one Helltide read; Boss and Legion counts remained unchanged. No input was synthesized. See validation.md for measurements and manual acceptance limits.
+- Published https://github.com/ihor-sokoliuk/sanctuary-timers. Independent Windows MSVC CI passed the build and all three test suites. Delivered a portable ZIP with runtime notices; private preferences, logs and cache are excluded.

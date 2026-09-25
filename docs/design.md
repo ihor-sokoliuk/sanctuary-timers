@@ -1,6 +1,6 @@
 # Diablo event overlay: design
 
-Updated September 25, 2026. This is the proposed native app design; the interactive preview is implemented, while the executable and live integration remain to be built and verified.
+Updated September 25, 2026. This is the approved design implemented by the native application. See [validation](validation.md) for measured results and the interaction checks that remain for the user.
 
 ## See three timers while playing
 
@@ -69,7 +69,7 @@ Deliver a portable executable with settings stored beside it in a writable direc
 
 The entry must appear under Task Manager > Startup apps with a recognizable name and icon. Respect disabling there: never modify Windows' disabled-state metadata or remove/recreate the entry to re-enable it. Store whether startup registration already occurred; do not silently re-create an entry the user later removes. If the user moves the portable folder and manually runs the app again, update an existing entry's path while preserving its disabled state.
 
-A single-instance guard prevents duplicate overlays. A tray menu provides settings and exit. This planning work does not register anything in the current user's startup list.
+A single-instance guard prevents duplicate overlays. A tray menu provides settings and exit. The first normal executable launch registers startup; tests and offscreen smoke checks do not.
 
 ## Native implementation and verification
 

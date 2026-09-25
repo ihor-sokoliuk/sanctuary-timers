@@ -2,6 +2,8 @@
 
 A compact native Windows overlay for Diablo IV's World Boss, Helltide and Legion timers.
 
+![Sanctuary Timers compact panel](docs/preview.png)
+
 ## Play with the overlay
 
 Place `SanctuaryTimers.exe` in a writable folder you intend to keep, then run it. Use Diablo IV in Windowed Fullscreen. The panel appears when Diablo is foreground and hides when another application takes focus.
