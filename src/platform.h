@@ -1,0 +1,17 @@
+#pragma once
+#include "core.h"
+#include <filesystem>
+#include <windows.h>
+namespace sanctuary {
+Time utcNow();
+Preferences loadPreferences(const std::filesystem::path&);
+bool savePreferences(const std::filesystem::path&, Preferences);
+std::array<Record,3> loadCache(const std::filesystem::path&,Time now);
+bool saveCache(const std::filesystem::path&,const std::array<Record,3>&);
+struct Response { std::optional<Record> record; Time retryAfter{}; unsigned status{}; std::string error; };
+Response fetchRecord(Kind,Time now);
+bool registerStartup(const std::filesystem::path& exe, Preferences& preferences);
+std::filesystem::path executablePath();
+bool isGameWindow(HWND);
+Box gameBounds(HWND);
+}

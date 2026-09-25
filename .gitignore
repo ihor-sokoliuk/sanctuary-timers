@@ -1,0 +1,11 @@
+/build/
+/dist/
+/.zig-cache/
+*.pdb
+*.obj
+*.o
+settings.ini
+events.ini
+diagnostics.log
+status.txt
+*.tmp
