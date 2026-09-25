@@ -130,7 +130,7 @@ class App {
    case Hit::Settings:settings=true;break;
    case Hit::Back:settings=false;break;
    case Hit::FontDown:--prefs.font;break;case Hit::FontUp:++prefs.font;break;
-   case Hit::WidthDown:prefs.width-=10;break;case Hit::WidthUp:prefs.width+=10;break;
+   case Hit::WidthDown:prefs.width-=5;break;case Hit::WidthUp:prefs.width+=5;break;
    case Hit::OpacityDown:prefs.opacity-=5;break;case Hit::OpacityUp:prefs.opacity+=5;break;
    case Hit::Drag:dragging=true;GetCursorPos(&dragStart);dragX=prefs.x;dragY=prefs.y;SetCapture(input);return;
    default:return;

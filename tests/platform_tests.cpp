@@ -13,7 +13,9 @@ int main() {
  auto copy=loadPreferences(p);
  REQUIRE(copy.font==18&&copy.width==410&&copy.opacity==43&&copy.x==72&&copy.y==88&&copy.collapsed&&copy.registered);
  std::ofstream(p)<<"[appearance]\nfont=999\nwidth=-1\nopacity=999\nx=-1\n";
- copy=loadPreferences(p);REQUIRE(copy.font==22&&copy.width>=350&&copy.opacity==100&&copy.x==0);
+ copy=loadPreferences(p);REQUIRE(copy.font==22&&copy.width>=300&&copy.width<350&&copy.opacity==100&&copy.x==0);
+ REQUIRE(savePreferences(p,{15,245,75,0,0,false,true}));
+ copy=loadPreferences(p);REQUIRE(copy.font==15&&copy.width==245);
  std::array<Record,3> records{};records[0]={1790370000,1790382600,0,1790369000,true,false};
  p=folder/L"events.ini";REQUIRE(saveCache(p,records));
  auto cache=loadCache(p,1790370100);

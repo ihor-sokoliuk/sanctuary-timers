@@ -23,15 +23,16 @@ int main(){
   font->Release();family->Release();collection->Release();format->Release();
  }
  for(int size=11;size<=22;++size){
-  auto p=normalize({size,270,10});auto l=layout(p,false);IDWriteTextFormat* f{};
+  auto p=normalize({size,1,10});auto l=layout(p,false);IDWriteTextFormat* f{};
   REQUIRE(SUCCEEDED(r.createTextFormat(static_cast<float>(size),true,&f)));
   f->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-  for(auto s:{L"ends ~55:00",L"~3:30:00",L"World Boss"}){
-   IDWriteTextFormat* actualFormat{};REQUIRE(SUCCEEDED(r.createTextFormat(static_cast<float>(size),s[0]!=L'W',&actualFormat)));
+  for(auto s:{L"ends ~55:00",L"ends ~88:88",L"ends ~00:00",L"~23:59:59",L"~Now",L"in ~05:00",L"World Boss",L"Helltide",L"Legion"}){
+   bool label=s[0]==L'W'||s[0]==L'H'||s[0]==L'L';
+   IDWriteTextFormat* actualFormat{};REQUIRE(SUCCEEDED(r.createTextFormat(static_cast<float>(size),!label,&actualFormat)));
    IDWriteTextLayout* text{};REQUIRE(SUCCEEDED(factory->CreateTextLayout(s,static_cast<UINT32>(wcslen(s)),actualFormat,1000,1000,&text)));
-   DWRITE_TEXT_METRICS m{};REQUIRE(SUCCEEDED(text->GetMetrics(&m)));int available=s[0]==L'W'?l.labelWidth:l.timeWidth;
-   if(m.widthIncludingTrailingWhitespace>available)std::wcerr<<L"Clipped at "<<size<<L" px: "<<s<<L" needs "<<m.widthIncludingTrailingWhitespace<<L", has "<<available<<'\n';
-   REQUIRE(m.widthIncludingTrailingWhitespace<=available);text->Release();actualFormat->Release();
+   DWRITE_TEXT_METRICS m{};REQUIRE(SUCCEEDED(text->GetMetrics(&m)));int available=label?l.labelWidth:l.timeWidth;
+   if(m.widthIncludingTrailingWhitespace+1>available)std::wcerr<<L"Clipped at "<<size<<L" px: "<<s<<L" needs "<<m.widthIncludingTrailingWhitespace+1<<L", has "<<available<<'\n';
+   REQUIRE(m.widthIncludingTrailingWhitespace+1<=available);text->Release();actualFormat->Release();
   }
   f->Release();std::array<Record,3> records{};
   REQUIRE(r.draw(hwnd,p,false,records,1790366400,1.f,{0,0,l.width,l.height},L"Offline estimates"));
@@ -47,5 +48,5 @@ int main(){
  auto backgroundAlpha=bytes[54+(15*270+140)*4+3];REQUIRE(maxAlpha>=250&&backgroundAlpha>=20&&backgroundAlpha<=32);
  std::filesystem::remove(path);
  REQUIRE(!IsWindowVisible(hwnd));REQUIRE(GetForegroundWindow()==foreground);DestroyWindow(hwnd);
- std::cout<<"PASS renderer: embedded PT Serif regular/bold without fallback, 12 font sizes, text metrics, transparent background with opaque text, resource recreation, hidden/no-activate\n";
+ std::cout<<"PASS renderer: embedded PT Serif regular/bold without fallback, compact minimum widths at 12 font sizes, text metrics, transparent background with opaque text, resource recreation, hidden/no-activate\n";
 }
