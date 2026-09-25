@@ -4,11 +4,28 @@
 #include <vector>
 namespace sanctuary {
 template<class T>static void release(T*& x){if(x){x->Release();x=nullptr;}}
-Renderer::~Renderer(){if(dc_){SelectObject(dc_,old_);if(bitmap_)DeleteObject(bitmap_);DeleteDC(dc_);}release(brush_);release(target_);release(write_);release(factory_);}
+Renderer::~Renderer(){if(dc_){SelectObject(dc_,old_);if(bitmap_)DeleteObject(bitmap_);DeleteDC(dc_);}release(brush_);release(target_);release(fonts_);if(write_&&fontLoader_)write_->UnregisterFontFileLoader(fontLoader_);release(fontLoader_);release(write_);release(factory_);}
 bool Renderer::init(){
  if(FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,&factory_)))return false;
- if(FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory),reinterpret_cast<IUnknown**>(&write_))))return false;
+ if(FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory5),reinterpret_cast<IUnknown**>(&write_)))||!loadFonts())return false;
  dc_=CreateCompatibleDC(nullptr);return dc_&&createTarget();
+}
+bool Renderer::loadFonts(){
+ if(FAILED(write_->CreateInMemoryFontFileLoader(&fontLoader_))||FAILED(write_->RegisterFontFileLoader(fontLoader_)))return false;
+ IDWriteFontSetBuilder1* builder{};if(FAILED(write_->CreateFontSetBuilder(&builder)))return false;
+ bool ok=true;
+ for(int id:{101,102}){
+  auto module=GetModuleHandleW(nullptr);auto resource=FindResourceW(module,MAKEINTRESOURCEW(id),RT_RCDATA);
+  auto bytes=resource?LockResource(LoadResource(module,resource)):nullptr;
+  auto length=resource?SizeofResource(module,resource):0;IDWriteFontFile* file{};
+  if(!bytes||!length||FAILED(fontLoader_->CreateInMemoryFontFileReference(write_,bytes,length,nullptr,&file)))ok=false;
+  else if(FAILED(builder->AddFontFile(file)))ok=false;
+  release(file);if(!ok)break;
+ }
+ IDWriteFontSet* set{};
+ if(ok)ok=SUCCEEDED(builder->CreateFontSet(&set));
+ if(ok)ok=SUCCEEDED(write_->CreateFontCollectionFromFontSet(set,&fonts_));
+ release(set);release(builder);return ok;
 }
 void Renderer::discardDeviceResources(){release(brush_);release(target_);}
 bool Renderer::createTarget(){
@@ -18,10 +35,14 @@ bool Renderer::createTarget(){
  return true;
 }
 void Renderer::color(unsigned rgb,float alpha){brush_->SetColor(D2D1::ColorF(rgb,alpha));}
+HRESULT Renderer::createTextFormat(float size,bool bold,IDWriteTextFormat** format){
+ return write_->CreateTextFormat(L"PT Serif",fonts_,bold?DWRITE_FONT_WEIGHT_BOLD:DWRITE_FONT_WEIGHT_NORMAL,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,size,L"en-us",format);
+}
 void Renderer::text(const std::wstring& s,float x,float y,float w,float h,float size,unsigned rgb,bool right,bool bold){
  IDWriteTextFormat* font{};
- if(FAILED(write_->CreateTextFormat(L"Segoe UI",nullptr,bold?DWRITE_FONT_WEIGHT_SEMI_BOLD:DWRITE_FONT_WEIGHT_NORMAL,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,size,L"en-us",&font)))return;
+ if(FAILED(createTextFormat(size,bold,&font)))return;
  font->SetTextAlignment(right?DWRITE_TEXT_ALIGNMENT_TRAILING:DWRITE_TEXT_ALIGNMENT_LEADING);font->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);font->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+ color(0x000000,.8f);target_->DrawText(s.c_str(),static_cast<UINT32>(s.size()),font,D2D1::RectF(x+.8f,y+.8f,x+w+.8f,y+h+.8f),brush_,D2D1_DRAW_TEXT_OPTIONS_CLIP);
  color(rgb);target_->DrawText(s.c_str(),static_cast<UINT32>(s.size()),font,D2D1::RectF(x,y,x+w,y+h),brush_,D2D1_DRAW_TEXT_OPTIONS_CLIP);font->Release();
 }
 void Renderer::line(float x1,float y1,float x2,float y2,unsigned rgb,float width){color(rgb);target_->DrawLine(D2D1::Point2F(x1,y1),D2D1::Point2F(x2,y2),brush_,width);}

@@ -14,6 +14,8 @@ Boss names and locations are omitted. The product has no maps, outbound event li
 
 The initial target is approximately 270 by 82 logical pixels at 13-pixel text. Actual native dimensions are subject to font metrics and Windows display scaling. Text size, width, and background opacity are adjustable. Larger text expands the minimum width so labels and times remain readable. Long countdowns use compact hours/minutes/seconds. Text remains legible independently of background transparency.
 
+The September 25 typography refinement uses embedded PT Serif regular for labels and bold for countdowns, with a subtle dark shadow, following the user's in-game screenshot. Fonts load privately from executable resources; no Windows font installation is required.
+
 ## Follow the game
 
 Diablo is configured for Windowed Fullscreen. The overlay identifies the game's foreground window and derives placement from that window, rather than a hardcoded monitor. Store the user's placement relative to the game window and clamp it to the available game area after moves, resizes, DPI changes, or monitor removal.

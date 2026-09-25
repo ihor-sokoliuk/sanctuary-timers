@@ -10,6 +10,8 @@ Place `SanctuaryTimers.exe` in a writable folder you intend to keep, then run it
 
 The left strip contains collapse/expand, drag, and settings. The timer area lets clicks pass to the game. Settings open inside the panel: adjust text size, width, and background opacity with the minus/plus controls. Text stays opaque. Appearance and position are saved beside the executable.
 
+Labels and timers use embedded PT Serif lettering with a subtle dark shadow to match the game's serif UI style. No system font installation is needed.
+
 There are no sounds, popups, flashing alerts, maps, or build tools. `Now` means the scheduled event started within the last minute; it does not claim a boss is still alive in your instance. Helltide switches between `ends` and `in` at its known boundaries. `~` marks estimated/offline data; an em dash means no trustworthy timing anchor is available.
 
 ## Start with Windows or exit
@@ -26,7 +28,7 @@ Helltides follow the hourly 55-minute cycle. World Boss and Legion calculations 
 
 ## Build and test
 
-Windows 10/11 x64. No browser engine, Python, .NET, or installed runtime is required to use the built executable.
+Windows 10 (version 1703 or newer)/11 x64. No browser engine, Python, .NET, or installed runtime is required to use the built executable.
 
 With a portable [Zig 0.15.2](https://ziglang.org/download/) C++ compiler:
 

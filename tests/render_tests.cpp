@@ -11,11 +11,28 @@ int main(){
  REQUIRE(hwnd);
  Renderer r;REQUIRE(r.init());
  IDWriteFactory* factory{};REQUIRE(SUCCEEDED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory),reinterpret_cast<IUnknown**>(&factory))));
+ // Exercise the renderer's real font collection, so system fallback cannot mask missing embedded fonts.
+ for(bool bold:{false,true}){
+  IDWriteTextFormat* format{};REQUIRE(SUCCEEDED(r.createTextFormat(15,bold,&format)));
+  wchar_t familyName[64]{};REQUIRE(SUCCEEDED(format->GetFontFamilyName(familyName,64)));REQUIRE(std::wstring(familyName)==L"PT Serif");
+  IDWriteFontCollection* collection{};REQUIRE(SUCCEEDED(format->GetFontCollection(&collection)));REQUIRE(collection);
+  UINT32 index{};BOOL exists{};REQUIRE(SUCCEEDED(collection->FindFamilyName(L"PT Serif",&index,&exists)));REQUIRE(exists);
+  IDWriteFontFamily* family{};REQUIRE(SUCCEEDED(collection->GetFontFamily(index,&family)));
+  IDWriteFont* font{};REQUIRE(SUCCEEDED(family->GetFirstMatchingFont(bold?DWRITE_FONT_WEIGHT_BOLD:DWRITE_FONT_WEIGHT_NORMAL,DWRITE_FONT_STRETCH_NORMAL,DWRITE_FONT_STYLE_NORMAL,&font)));
+  REQUIRE(font->GetSimulations()==DWRITE_FONT_SIMULATIONS_NONE);REQUIRE(font->GetWeight()==(bold?DWRITE_FONT_WEIGHT_BOLD:DWRITE_FONT_WEIGHT_NORMAL));
+  font->Release();family->Release();collection->Release();format->Release();
+ }
  for(int size=11;size<=22;++size){
   auto p=normalize({size,270,10});auto l=layout(p,false);IDWriteTextFormat* f{};
-  REQUIRE(SUCCEEDED(factory->CreateTextFormat(L"Segoe UI",nullptr,DWRITE_FONT_WEIGHT_SEMI_BOLD,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,static_cast<float>(size),L"en-us",&f)));
+  REQUIRE(SUCCEEDED(r.createTextFormat(static_cast<float>(size),true,&f)));
   f->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-  for(auto s:{L"ends ~55:00",L"~3:30:00",L"World Boss"}){IDWriteTextLayout* text{};REQUIRE(SUCCEEDED(factory->CreateTextLayout(s,static_cast<UINT32>(wcslen(s)),f,1000,1000,&text)));DWRITE_TEXT_METRICS m{};REQUIRE(SUCCEEDED(text->GetMetrics(&m)));REQUIRE(m.widthIncludingTrailingWhitespace<=(s[0]==L'W'?l.labelWidth:l.timeWidth));text->Release();}
+  for(auto s:{L"ends ~55:00",L"~3:30:00",L"World Boss"}){
+   IDWriteTextFormat* actualFormat{};REQUIRE(SUCCEEDED(r.createTextFormat(static_cast<float>(size),s[0]!=L'W',&actualFormat)));
+   IDWriteTextLayout* text{};REQUIRE(SUCCEEDED(factory->CreateTextLayout(s,static_cast<UINT32>(wcslen(s)),actualFormat,1000,1000,&text)));
+   DWRITE_TEXT_METRICS m{};REQUIRE(SUCCEEDED(text->GetMetrics(&m)));int available=s[0]==L'W'?l.labelWidth:l.timeWidth;
+   if(m.widthIncludingTrailingWhitespace>available)std::wcerr<<L"Clipped at "<<size<<L" px: "<<s<<L" needs "<<m.widthIncludingTrailingWhitespace<<L", has "<<available<<'\n';
+   REQUIRE(m.widthIncludingTrailingWhitespace<=available);text->Release();actualFormat->Release();
+  }
   f->Release();std::array<Record,3> records{};
   REQUIRE(r.draw(hwnd,p,false,records,1790366400,1.f,{0,0,l.width,l.height},L"Offline estimates"));
  }
@@ -30,5 +47,5 @@ int main(){
  auto backgroundAlpha=bytes[54+(15*270+140)*4+3];REQUIRE(maxAlpha>=250&&backgroundAlpha>=20&&backgroundAlpha<=32);
  std::filesystem::remove(path);
  REQUIRE(!IsWindowVisible(hwnd));REQUIRE(GetForegroundWindow()==foreground);DestroyWindow(hwnd);
- std::cout<<"PASS renderer: 12 font sizes, text metrics, transparent background with opaque text, resource recreation, hidden/no-activate\n";
+ std::cout<<"PASS renderer: embedded PT Serif regular/bold without fallback, 12 font sizes, text metrics, transparent background with opaque text, resource recreation, hidden/no-activate\n";
 }
