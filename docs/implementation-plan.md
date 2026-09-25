@@ -2,7 +2,7 @@
 
 **Goal:** Deliver a small native Windows overlay implementing the approved Diablo event specification.
 **Architecture:** Testable C++ scheduling/model core, WinHTTP adapter and portable state store, event-driven Win32 window with independent background alpha and opaque text. A worker runs bounded network requests; the UI owns state and schedules the next required wakeup.
-**Spec:** ../design.md (copy of the approved specification).
+**Spec:** [design.md](design.md) (copy of the approved specification).
 **Execution:** Inline, test first, then non-interactive live verification. The user has already authorized implementation, launch alongside Diablo, startup registration, and public source publication. No further planning checkpoint is needed.
 
 ## Constraints
@@ -15,10 +15,10 @@
 - Unit tests pass before any overlay executable is launched. Never synthesize user mouse or keyboard input while testing.
 
 ## Tasks
-1. [ ] Core: write failing tests for UTC parsing, boundary calculations, record validation, changed schedules, stale cache, transition batching, backoff, inactive deferral and clock changes. Implement and pass.
-2. [ ] Preferences/platform: failing tests for normalization, placement, startup decision policy, persistent file roundtrip and transport schema. Implement, pass, add bounded WinHTTP adapter.
-3. [ ] Native UI: use tested layout/hit-testing and state decisions; implement no-activate layered panel, icons, contained appearance controls, tray, focus/location notifications, background requests and atomic state persistence.
-4. [ ] Package/build: repeatable compiler command, CMake support, Windows CI, icon/version, MIT license, README, user-facing build artifact.
+1. [x] Core: write failing tests for UTC parsing, boundary calculations, record validation, changed schedules, stale cache, transition batching, backoff, inactive deferral and clock changes. Implement and pass.
+2. [x] Preferences/platform: failing tests for normalization, placement, startup decision policy, persistent file roundtrip and transport schema. Implement, pass, add bounded WinHTTP adapter.
+3. [x] Native UI: use tested layout/hit-testing and state decisions; implement no-activate layered panel, icons, contained appearance controls, tray, focus/location notifications, background requests and atomic state persistence.
+4. [x] Package/build: repeatable compiler command, CMake support, Windows CI, icon/version, MIT license, README, user-facing build artifact.
 5. [ ] Verify: full tests, review, isolated integration check, live passive launch, telemetry/resource measurement, exact limitation report. Publish only source/docs/tests to a new public repository.
 
 ## Review focus
@@ -32,3 +32,5 @@
 - 2026-09-25: confirmed Diablo IV is running; no existing native compiler found. Downloading a checksum-verified portable Zig C++ toolchain into scratch, with no system installation.
 - Ruling: use a new source directory under outputs rather than a worktree: this task has no Git repository or existing source. Initialize an isolated new repository there.
 - Ruling: existing projects are design references only; write the small core and UI independently, avoiding inherited unfinished UI and irrelevant features.
+- Core, platform and rendering suites pass before normal launch. Review added regression coverage for changed/exhausted schedule anchors, backward clock changes, request cancellation/deadlines and text widths. Forced Direct2D resource recreation is covered by an offscreen renderer check.
+- A 973,312-byte baseline x64 executable passed an offscreen no-activation smoke check. Initial normal launch preserved the foreground application and registered per-user startup. Live observation and public CI verification are in progress.

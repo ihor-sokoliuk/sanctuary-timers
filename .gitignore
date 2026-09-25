@@ -1,4 +1,5 @@
 /build/
+/build-msvc/
 /dist/
 /.zig-cache/
 *.pdb

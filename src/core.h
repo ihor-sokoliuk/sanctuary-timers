@@ -9,6 +9,7 @@
 namespace sanctuary {
 using Time = std::int64_t;
 enum class Kind { Boss, Helltide, Legion };
+struct RequestBudget { std::uint64_t started{}; bool permits(std::uint64_t ticks,bool allowed) const; };
 constexpr int bit(Kind k) { return 1 << static_cast<int>(k); }
 constexpr Time Never = INT64_MAX / 4;
 struct Record { Time start{}, next{}, end{}, checked{}; bool verified{}, failed{}; };
@@ -27,11 +28,13 @@ class Coordinator {
   std::array<Pending,3> requests{};
   void activate(Time now, bool newSession);
   void reconcile(Time now);
+  bool observeClock(Time now, std::uint64_t ticks);
   int takeDue(Time now, bool foreground);
   void complete(Kind, Time now, bool success, Time retryAfter=0);
   Time nextWake(Time now) const;
  private:
   std::array<Time,3> boundaries_{Never,Never,Never};
+  Time wall_{};std::uint64_t ticks_{};bool observed_{};
 };
 struct Preferences { int font{13}, width{270}, opacity{85}, x{24}, y{24}; bool collapsed{}, registered{}; };
 Preferences normalize(Preferences);
@@ -40,7 +43,7 @@ Box place(Box game, int width, int height, int x, int y);
 enum class StartupAction { None, Create, Update };
 StartupAction startupAction(bool registered, bool exists, bool samePath);
 enum class Hit { None, Collapse, Drag, Settings, Back, FontDown, FontUp, WidthDown, WidthUp, OpacityDown, OpacityUp };
-struct Layout { int width{},height{},rail{},row{}; };
+struct Layout { int width{},height{},rail{},row{},timeWidth{},labelWidth{}; };
 Layout layout(Preferences, bool settings);
 Hit hitTest(Preferences, bool settings, int x, int y);
 }

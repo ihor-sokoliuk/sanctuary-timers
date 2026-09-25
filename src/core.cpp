@@ -52,6 +52,7 @@ class Json {
 };
 }
 Time period(Kind k) {return k==Kind::Boss?12600:k==Kind::Legion?1500:3600;}
+bool RequestBudget::permits(std::uint64_t ticks,bool allowed)const{return allowed&&ticks-started<20000;}
 std::optional<Time> parseUtc(std::string_view s) {
  if(s.size()!=20&&s.size()!=24)return {};
  if(s[4]!='-'||s[7]!='-'||s[10]!='T'||s[13]!=':'||s[16]!=':'||s.back()!='Z')return {};
@@ -82,6 +83,7 @@ std::optional<Record> parseRecord(Kind k,std::string_view json,Time now) {
 }
 bool acceptRecord(Kind k,Record& a,const Record& b) {
  if(a.start&&b.start<a.start)return false;
+ if(k!=Kind::Helltide&&!b.verified&&b.next<=b.checked)return false;
  bool phaseChanged=a.start&&k!=Kind::Helltide&&(b.start-a.start)%period(k)!=0;
  a=b;if(phaseChanged)a.verified=false;return true;
 }
@@ -123,6 +125,12 @@ void Coordinator::reconcile(Time now) {
   boundaries_[i]=calculate(Kind(i),records[i],now).boundary;
  }
 }
+bool Coordinator::observeClock(Time now,std::uint64_t ticks){
+ Time drift=observed_?(now-wall_)-static_cast<Time>((ticks-ticks_)/1000):0;
+ bool jumped=observed_&&(drift>5||drift<-5);
+ if(jumped)for(auto& q:requests)if(q.failures&&q.due!=Never)q.due=std::max(now,q.due+drift);
+ wall_=now;ticks_=ticks;observed_=true;if(jumped)activate(now,true);return jumped;
+}
 int Coordinator::takeDue(Time now,bool foreground) {
  if(!foreground)return 0;int mask=0;
  for(int i=0;i<3;++i){auto& q=requests[i];if(!q.busy&&q.due<=now){q.busy=true;mask|=1<<i;}}
@@ -140,7 +148,7 @@ Time Coordinator::nextWake(Time now) const {
 Preferences normalize(Preferences p) {p.font=std::clamp(p.font,11,22);p.width=std::clamp(p.width, std::max(240,p.font*17+35),560);p.opacity=std::clamp(p.opacity,10,100);p.x=std::clamp(p.x,0,16000);p.y=std::clamp(p.y,0,16000);return p;}
 Box place(Box game,int width,int height,int x,int y) {width=std::max(1,std::min(width,game.width));height=std::max(1,std::min(height,game.height));return {game.x+std::clamp(x,0,game.width-width),game.y+std::clamp(y,0,game.height-height),width,height};}
 StartupAction startupAction(bool registered,bool exists,bool samePath) {if(!exists)return registered?StartupAction::None:StartupAction::Create;return samePath?StartupAction::None:StartupAction::Update;}
-Layout layout(Preferences p,bool settings) {p=normalize(p);int row=std::max(24,p.font+12);return {settings?std::max(320,p.width):p.collapsed?28:p.width,settings?246:row*3+8,28,row};}
+Layout layout(Preferences p,bool settings) {p=normalize(p);int row=std::max(24,p.font+12);int width=settings?std::max(320,p.width):p.collapsed?28:p.width;int timeWidth=p.font*9;return {width,settings?246:row*3+8,28,row,timeWidth,width-58-timeWidth-16};}
 Hit hitTest(Preferences p,bool settings,int x,int y) {
  auto l=layout(p,settings);if(x<0||y<0||x>=l.width||y>=l.height)return Hit::None;
  if(settings){if(y<32)return Hit::Back;for(int i=0;i<3;++i)if(y>=42+i*40&&y<74+i*40){if(x>=l.width-82&&x<l.width-48)return Hit(int(Hit::FontDown)+i*2);if(x>=l.width-42)return Hit(int(Hit::FontUp)+i*2);}return Hit::None;}
