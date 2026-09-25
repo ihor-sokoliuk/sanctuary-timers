@@ -12,6 +12,8 @@ The left strip contains collapse/expand, drag, and settings. The timer area lets
 
 Labels and timers use embedded PT Serif lettering with a subtle dark shadow to match the game's serif UI style. No system font installation is needed.
 
+Each event name matches its countdown color: red for World Boss, orange for Helltide, and blue-gray for Legion. Estimated/offline names and countdowns share the muted estimate color.
+
 There are no sounds, popups, flashing alerts, maps, or build tools. `Now` means the scheduled event started within the last minute; it does not claim a boss is still alive in your instance. Helltide switches between `ends` and `in` at its known boundaries. `~` marks estimated/offline data; an em dash means no trustworthy timing anchor is available.
 
 ## Start with Windows or exit
