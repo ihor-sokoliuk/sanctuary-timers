@@ -93,11 +93,7 @@ bool registerStartup(const std::filesystem::path& exe,Preferences& p){
 }
 std::filesystem::path executablePath(){std::wstring path(32768,L'\0');auto n=GetModuleFileNameW(nullptr,path.data(),static_cast<DWORD>(path.size()));path.resize(n);return path;}
 bool isGameWindow(HWND window){
- if(!window||!IsWindow(window)||!IsWindowVisible(window))return false;
- DWORD pid{};GetWindowThreadProcessId(window,&pid);HANDLE process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid);if(!process)return false;
- wchar_t image[32768]{};DWORD size=32768;bool game=false;
- if(QueryFullProcessImageNameW(process,0,image,&size)){const wchar_t* name=wcsrchr(image,L'\\');game=_wcsicmp(name?name+1:image,L"Diablo IV.exe")==0;}
- CloseHandle(process);return game;
+ return probeWindow(window).state==WindowState::GameReady;
 }
 Box gameBounds(HWND window){RECT r{};if(!GetClientRect(window,&r))return {};POINT p{0,0};ClientToScreen(window,&p);return {p.x,p.y,r.right-r.left,r.bottom-r.top};}
 }

@@ -32,6 +32,7 @@ Helltide and Legion countdowns. These instructions apply to this repository.
 | `src/clock.h`, `src/clock.cpp` | Pure SNTP packet validation, corrected clock and daily synchronization policy |
 | `src/clock_network.cpp` | Windows Sockets transport, bounded asynchronous DNS, time-server query and cancellation |
 | `src/platform.h`, `src/platform.cpp` | UTC fallback, INI persistence, WinHTTP event adapter, startup registry and game-window helpers |
+| `src/tracking.h`, `src/tracking.cpp` | Window readiness, discovery-event filtering, bounded focus recovery and diagnostic classifications |
 | `src/main.cpp` | Win32 message loop, foreground/location hooks, workers, timers, tray and diagnostics |
 | `src/render.h`, `src/render.cpp` | Direct2D/DirectWrite drawing, private embedded fonts, text metrics and bitmap export |
 | `resources/` | Executable version/icon and embedded PT Serif fonts |
@@ -55,7 +56,9 @@ Windows PowerShell 5.1; test compatibility there, not only in PowerShell 7.
 - Follow Diablo's window/monitor with WinEvent notifications. Keep automatic
   windows non-activating and topmost, the drawing surface click-through, and controls
   contained inside the panel. Hide when another app is foreground except for the
-  user's explicit tray Appearance action. Suspend hidden redraws and avoid focus polling.
+  user's explicit tray Appearance action. Suspend hidden redraws. Show/restore events
+  supplement foreground events; transient detection gets at most six retries within
+  four seconds, with no continuous focus polling or background-window activation.
 - Do not add game-memory reads, injection, gameplay automation, telemetry or alerts
   as incidental implementation choices. Preserve preferences and cached event data.
 
@@ -92,7 +95,7 @@ toolchain unnecessarily. With Zig 0.15.2 available on `PATH`:
 In the original Codex workspace, its verified local-toolchain location is
 `..\..\work\toolchain\zig-x86_64-windows-0.15.2\zig.exe`; pass that path to `-Zig`
 if it still exists. `-TestsOnly` omits the final application build. The script runs
-core, clock, platform and offscreen rendering tests before producing
+core, clock, tracking, platform and offscreen rendering tests before producing
 `build\SanctuaryTimers.exe`; it does not launch the overlay or register startup.
 
 MSVC alternative:
@@ -183,6 +186,8 @@ Dot-sourcing loads functions without installing anything. Wait for a newly writt
 status file before reading it. Useful fields include `startup_ok`, `paint_errors`,
 `event*_reads/failures/checked`, `clock_synced`, `clock_reads`, `clock_failures`,
 `clock_offset_ms` and `clock_next_ms`. Do not force focus merely to make `visible=1`.
+For launch detection, also check `window_state`, `window_error`, `discovery_hooks_ok`,
+`focus_retry_checks` and `focus_retry_pending`; logs identify the event and rejected state.
 
 Keep machine-specific logs, cached state, toolchains and temporary evidence out of
 Git/release assets. The packager copies `docs/`, so put only sanitized documentation

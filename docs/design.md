@@ -24,6 +24,10 @@ Diablo is configured for Windowed Fullscreen. The overlay identifies the game's 
 
 Use out-of-context Windows foreground and window-location event notifications. Resolve the foreground process only when an event requires it. Do not repeatedly enumerate processes on a timer. Perform one initial foreground check at startup. Hide the overlay when another application becomes active. Overlay controls should not activate the window during ordinary interaction; appearance editing may keep the owned settings UI visible, while switching to an unrelated app hides it.
 
+As of 0.1.5, also observe top-level window-show and restore notifications. Recheck the actual foreground window when processing an event; ignore background-window and child-control show events. Track location/destruction as soon as a Diablo process is recognized, including while its window is hidden, minimized or has zero client area. A relevant event may recover a hidden overlay even without another focus change. Repeated ready-window notifications do not create a new session or refetch event records.
+
+If foreground lookup is temporarily unavailable or the game's window is not ready, use up to six delayed checks (100, 200, 400, 800, 1000 and 1000 ms) within one four-second recovery window. Duplicate events do not extend that window. Stop retries on success, another application, or an overlay-owned window; keep listening for normal events after the retry budget expires. This is bounded launch recovery, not continuous polling. Logs record the trigger, window handle, process ID, classification and Windows error without collecting window titles.
+
 Render countdowns at most once per second while visible. Suspend redraws while hidden. A collapsed panel keeps only its compact control tab. Ordinary display text should not steal keyboard focus or gameplay clicks; rail controls remain interactive, with input behavior verified in the actual game.
 
 ## Calculate locally from verified timing anchors

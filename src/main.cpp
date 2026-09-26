@@ -14,11 +14,14 @@ namespace {
 constexpr wchar_t DisplayClass[]=L"SanctuaryTimersDisplay";
 constexpr wchar_t InputClass[]=L"SanctuaryTimersControls";
 constexpr UINT FocusMessage=WM_APP+1,DataMessage=WM_APP+2,StatusMessage=WM_APP+3,SnapshotMessage=WM_APP+4,TrayMessage=WM_APP+5,LocationMessage=WM_APP+6,ClockMessage=WM_APP+7;
-constexpr UINT_PTR PaintTimer=1,NetworkTimer=2,ClockTimer=3;
+constexpr UINT_PTR PaintTimer=1,NetworkTimer=2,ClockTimer=3,FocusTimer=4;
 HWND appWindow{};
 void CALLBACK windowEvent(HWINEVENTHOOK,DWORD event,HWND window,LONG object,LONG child,DWORD,DWORD){
  if(!appWindow)return;
- if(event==EVENT_SYSTEM_FOREGROUND)PostMessageW(appWindow,FocusMessage,0,reinterpret_cast<LPARAM>(window));
+ if(discoveryEvent(event,object,child)){
+  if(event==EVENT_OBJECT_SHOW&&GetAncestor(window,GA_ROOT)!=window)return;
+  PostMessageW(appWindow,FocusMessage,event,reinterpret_cast<LPARAM>(window));
+ }
  else if(object==OBJID_WINDOW&&child==CHILDID_SELF)PostMessageW(appWindow,LocationMessage,event,reinterpret_cast<LPARAM>(window));
 }
 struct Batch {int requested{},performed{};std::array<Response,3> response;};
@@ -27,8 +30,9 @@ class App {
  HWND display{},input{},game{};
  Preferences prefs;Coordinator coordinator;Renderer renderer;DailyClock clock;
  std::filesystem::path directory;
- HWINEVENTHOOK focusHook{},locationHook{},destroyHook{};
- DWORD gamePid{};float scale{1};Box bounds{};
+ HWINEVENTHOOK focusHook{},showHook{},restoreHook{},locationHook{},destroyHook{};
+ DWORD gamePid{},hookedPid{};float scale{1};Box bounds{};
+ FocusRetry focusRetry;WindowProbe lastProbe;bool haveProbe{};unsigned recoveryChecks{};
  bool visible{},settings{},editing{},dragging{},smoke{},writable{},startupOk{},closing{};
  POINT dragStart{};int dragX{},dragY{};
  std::atomic_bool active{false};std::thread worker;
@@ -37,7 +41,7 @@ class App {
  unsigned long long paints{},paintErrors{},focusChanges{};std::array<unsigned,3> reads{},failures{};
  std::wstring status=L"Waiting for Diablo IV";
  explicit App(bool test):smoke(test){directory=executablePath().parent_path();prefs=smoke?Preferences{}:loadPreferences(directory/L"settings.ini");if(!smoke)coordinator.records=loadCache(directory/L"events.ini",utcNow());}
- ~App(){active=false;running=false;if(worker.joinable())worker.join();if(clockWorker.joinable())clockWorker.join();if(focusHook)UnhookWinEvent(focusHook);if(locationHook)UnhookWinEvent(locationHook);if(destroyHook)UnhookWinEvent(destroyHook);if(tray.hWnd)Shell_NotifyIconW(NIM_DELETE,&tray);if(trayIcon)DestroyIcon(trayIcon);}
+ ~App(){active=false;running=false;if(worker.joinable())worker.join();if(clockWorker.joinable())clockWorker.join();if(focusHook)UnhookWinEvent(focusHook);if(showHook)UnhookWinEvent(showHook);if(restoreHook)UnhookWinEvent(restoreHook);if(locationHook)UnhookWinEvent(locationHook);if(destroyHook)UnhookWinEvent(destroyHook);if(tray.hWnd)Shell_NotifyIconW(NIM_DELETE,&tray);if(trayIcon)DestroyIcon(trayIcon);}
  Millis nowMillis()const{return clock.now(utcMillis(),GetTickCount64());}
  Time now()const{return nowMillis()/1000;}
  void log(const std::string& message){if(smoke)return;auto path=directory/L"diagnostics.log";std::error_code ec;if(std::filesystem::file_size(path,ec)>256*1024&&!ec){std::ofstream clear(path,std::ios::trunc);}std::ofstream f(path,std::ios::app);f<<utcNow()<<' '<<message<<'\n';}
@@ -46,6 +50,7 @@ class App {
   std::ofstream f(directory/L"status.txt");auto foreground=GetForegroundWindow();DWORD pid{};GetWindowThreadProcessId(foreground,&pid);
   f<<"utc="<<utcNow()<<"\nvisible="<<visible<<"\nforeground_pid="<<pid<<"\ngame_pid="<<gamePid<<"\nsettings="<<settings<<"\ncollapsed="<<prefs.collapsed<<"\nstartup_registered="<<prefs.registered<<"\nstartup_ok="<<startupOk<<"\npaints="<<paints<<"\npaint_errors="<<paintErrors<<"\nfocus_changes="<<focusChanges<<"\nscale="<<scale<<"\nx="<<bounds.x<<"\ny="<<bounds.y<<"\nwidth="<<bounds.width<<"\nheight="<<bounds.height<<"\n";
   f<<"clock_utc_ms="<<nowMillis()<<"\nclock_reads="<<clockReads<<"\nclock_failures="<<clock.failures()<<"\nclock_synced="<<bool(clock.sample())<<"\nclock_next_ms="<<clock.untilDue(GetTickCount64())<<'\n';
+  f<<"window_state="<<windowStateName(lastProbe.state)<<"\nwindow_error="<<lastProbe.error<<"\ndiscovery_hooks_ok="<<bool(focusHook&&showHook&&restoreHook)<<"\nfocus_retry_checks="<<recoveryChecks<<"\nfocus_retry_pending="<<bool(focusRetry.next())<<'\n';
   if(clock.sample())f<<"clock_checked="<<clock.sample()->utcMillis/1000<<"\nclock_offset_ms="<<clock.sample()->offsetMillis<<"\nclock_roundtrip_ms="<<clock.sample()->roundTripMillis<<'\n';
   for(int i=0;i<3;++i)f<<"event"<<i<<"_reads="<<reads[i]<<"\nevent"<<i<<"_failures="<<failures[i]<<"\nevent"<<i<<"_checked="<<coordinator.records[i].checked<<"\nevent"<<i<<"_verified="<<coordinator.records[i].verified<<"\nevent"<<i<<"_due="<<coordinator.requests[i].due<<'\n';
  }
@@ -68,22 +73,37 @@ class App {
   if(writable){startupOk=registerStartup(executablePath(),prefs);save();}else log("portable folder is not writable; startup not registered");
   trayIcon=static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(1),IMAGE_ICON,32,32,0));if(!trayIcon)trayIcon=makeIcon();tray.cbSize=sizeof(tray);tray.hWnd=display;tray.uID=1;tray.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;tray.uCallbackMessage=TrayMessage;tray.hIcon=trayIcon;wcscpy_s(tray.szTip,L"Sanctuary Timers");Shell_NotifyIconW(NIM_ADD,&tray);
   focusHook=SetWinEventHook(EVENT_SYSTEM_FOREGROUND,EVENT_SYSTEM_FOREGROUND,nullptr,windowEvent,0,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
-  if(!focusHook){log("foreground hook unavailable");return false;}
-  log("started; no-activate display and event-driven tracking");focus(GetForegroundWindow());scheduleClock();return true;
+  showHook=SetWinEventHook(EVENT_OBJECT_SHOW,EVENT_OBJECT_SHOW,nullptr,windowEvent,0,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
+  restoreHook=SetWinEventHook(EVENT_SYSTEM_MINIMIZEEND,EVENT_SYSTEM_MINIMIZEEND,nullptr,windowEvent,0,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
+  if(!focusHook||!showHook||!restoreHook){log("window discovery hook unavailable");return false;}
+  log("started; no-activate display and event-driven tracking");focus("startup");scheduleClock();return true;
  }
- void hooks(){
+ void hooks(DWORD pid){
   if(locationHook)UnhookWinEvent(locationHook);if(destroyHook)UnhookWinEvent(destroyHook);
-  locationHook=SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE,EVENT_OBJECT_LOCATIONCHANGE,nullptr,windowEvent,gamePid,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
-  destroyHook=SetWinEventHook(EVENT_OBJECT_DESTROY,EVENT_OBJECT_DESTROY,nullptr,windowEvent,gamePid,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
+  locationHook=SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE,EVENT_OBJECT_LOCATIONCHANGE,nullptr,windowEvent,pid,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
+  destroyHook=SetWinEventHook(EVENT_OBJECT_DESTROY,EVENT_OBJECT_DESTROY,nullptr,windowEvent,pid,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
+  hookedPid=pid;if(!locationHook||!destroyHook)log("game location/destroy hook unavailable");
  }
  void hide(){visible=false;active=false;dragging=false;KillTimer(display,PaintTimer);KillTimer(display,NetworkTimer);ShowWindow(input,SW_HIDE);ShowWindow(display,SW_HIDE);if(GetCapture()==input)ReleaseCapture();}
- void focus(HWND hwnd){
+ void focus(const char* source,bool geometry=false){
   ++focusChanges;
   // Verify the current foreground window, rather than trusting a queued historical event.
-  hwnd=GetForegroundWindow();DWORD pid{};GetWindowThreadProcessId(hwnd,&pid);if(pid==GetCurrentProcessId())return;
-  if(isGameWindow(hwnd)){
-   bool newSession=pid!=gamePid;game=hwnd;gamePid=pid;if(newSession)hooks();editing=false;active=true;visible=true;coordinator.activate(now(),newSession);position();paint();ShowWindow(display,SW_SHOWNOACTIVATE);ShowWindow(input,SW_SHOWNOACTIVATE);schedule();log(newSession?"game session active":"game foreground");
-  }else {editing=false;hide();log("hidden; game not foreground");}
+  auto probe=probeWindow(GetForegroundWindow());auto tick=GetTickCount64();focusRetry.observe(probe.state,tick);
+  KillTimer(display,FocusTimer);
+  if(focusRetry.next())SetTimer(display,FocusTimer,static_cast<UINT>(focusRetry.next()>tick?focusRetry.next()-tick:1),nullptr);
+  if(!haveProbe||probe.window!=lastProbe.window||probe.pid!=lastProbe.pid||probe.state!=lastProbe.state||probe.error!=lastProbe.error){
+   log(std::string("window check source=")+source+" hwnd="+std::to_string(reinterpret_cast<std::uintptr_t>(probe.window))+" pid="+std::to_string(probe.pid)+" state="+windowStateName(probe.state)+" error="+std::to_string(probe.error));
+   lastProbe=probe;haveProbe=true;
+  }
+  if(probe.state==WindowState::Own)return;
+  bool gameWindow=probe.state==WindowState::GameReady||probe.state==WindowState::GameHidden||probe.state==WindowState::GameMinimized||probe.state==WindowState::GameEmpty;
+  bool changedWindow=game!=probe.window;
+  if(gameWindow){game=probe.window;if(hookedPid!=probe.pid)hooks(probe.pid);}
+  if(probe.state==WindowState::GameReady){
+   bool newSession=probe.pid!=gamePid;
+   if(visible&&!editing&&!newSession&&!changedWindow){if(geometry){position();paint();}return;}
+   gamePid=probe.pid;editing=false;active=true;visible=true;coordinator.activate(now(),newSession);position();paint();ShowWindow(display,SW_SHOWNOACTIVATE);ShowWindow(input,SW_SHOWNOACTIVATE);schedule();log(newSession?"game session active":"game foreground");
+  }else {editing=false;hide();}
  }
  void position(){
   Box area;
@@ -173,8 +193,8 @@ class App {
    case WM_MOUSEACTIVATE:return MA_NOACTIVATE;
    case WM_ERASEBKGND:return 1;
    case WM_PAINT: {PAINTSTRUCT ps{};auto dc=BeginPaint(hwnd,&ps);if(hwnd==a->input)FillRect(dc,&ps.rcPaint,static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));EndPaint(hwnd,&ps);return 0;}
-   case FocusMessage:a->focus(reinterpret_cast<HWND>(l));return 0;
-   case LocationMessage:if(reinterpret_cast<HWND>(l)==a->game){if(w==EVENT_OBJECT_DESTROY||IsIconic(a->game)){a->hide();}else if(a->visible){a->position();a->paint();}}return 0;
+   case FocusMessage:if(relevantWindowEvent(static_cast<DWORD>(w),reinterpret_cast<HWND>(l),GetForegroundWindow(),a->game))a->focus(w==EVENT_OBJECT_SHOW?"show":w==EVENT_SYSTEM_MINIMIZEEND?"restore":"foreground");return 0;
+   case LocationMessage:if(relevantWindowEvent(static_cast<DWORD>(w),reinterpret_cast<HWND>(l),GetForegroundWindow(),a->game))a->focus(w==EVENT_OBJECT_DESTROY?"destroy":"location",true);return 0;
    case DataMessage:a->data(reinterpret_cast<Batch*>(l));return 0;
    case ClockMessage:a->clockData(reinterpret_cast<ClockResponse*>(l));return 0;
    case StatusMessage:a->dump();return 0;
@@ -182,8 +202,9 @@ class App {
    case WM_TIMER:
     if(w==PaintTimer){KillTimer(hwnd,PaintTimer);if(a->coordinator.observeClock(a->now(),GetTickCount64()))a->schedule();a->paint();a->armPaint();}
     else if(w==NetworkTimer){KillTimer(hwnd,NetworkTimer);a->schedule();}
-    else if(w==ClockTimer)a->scheduleClock();return 0;
-   case WM_TIMECHANGE:case WM_POWERBROADCAST:if(message==WM_TIMECHANGE||w==PBT_APMRESUMEAUTOMATIC||w==PBT_APMRESUMESUSPEND){a->coordinator.observeClock(a->now(),GetTickCount64());a->coordinator.activate(a->now(),true);a->focus(GetForegroundWindow());a->scheduleClock();}return TRUE;
+    else if(w==ClockTimer)a->scheduleClock();
+    else if(w==FocusTimer){KillTimer(hwnd,FocusTimer);if(a->focusRetry.takeDue(GetTickCount64())){++a->recoveryChecks;a->focus("retry");}}return 0;
+   case WM_TIMECHANGE:case WM_POWERBROADCAST:if(message==WM_TIMECHANGE||w==PBT_APMRESUMEAUTOMATIC||w==PBT_APMRESUMESUSPEND){a->coordinator.observeClock(a->now(),GetTickCount64());a->coordinator.activate(a->now(),true);a->focusRetry={};a->focus("resume/time-change");a->schedule();a->scheduleClock();}return TRUE;
    case WM_DPICHANGED:case WM_DISPLAYCHANGE:if(a->visible){a->position();a->paint();}return 0;
    case WM_LBUTTONDOWN:if(hwnd==a->input)a->click(static_cast<int>(GET_X_LPARAM(l)/a->scale),static_cast<int>(GET_Y_LPARAM(l)/a->scale));return 0;
    case WM_MOUSEMOVE:if(a->dragging){POINT p{};GetCursorPos(&p);a->prefs.x=std::max(0,a->dragX+static_cast<int>((p.x-a->dragStart.x)/a->scale));a->prefs.y=std::max(0,a->dragY+static_cast<int>((p.y-a->dragStart.y)/a->scale));a->position();a->paint();}return 0;

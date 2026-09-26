@@ -1,6 +1,7 @@
 #pragma once
 #include "core.h"
 #include "clock.h"
+#include "tracking.h"
 #include <filesystem>
 #include <atomic>
 #include <windows.h>

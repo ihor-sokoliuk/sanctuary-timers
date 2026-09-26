@@ -12,7 +12,11 @@ try {
   if($LASTEXITCODE) { throw 'Clock test compilation failed' }
   & ./build/clock_tests.exe
   if($LASTEXITCODE) { throw 'Clock tests failed; application build blocked' }
-  & $Zig c++ @common src/core.cpp src/clock.cpp src/platform.cpp src/clock_network.cpp tests/platform_tests.cpp -lwinhttp -luser32 -ladvapi32 -lws2_32 -o build/platform_tests.exe
+  & $Zig c++ @common src/tracking.cpp tests/tracking_tests.cpp -luser32 -o build/tracking_tests.exe
+  if($LASTEXITCODE) { throw 'Tracking test compilation failed' }
+  & ./build/tracking_tests.exe
+  if($LASTEXITCODE) { throw 'Tracking tests failed; application build blocked' }
+  & $Zig c++ @common src/core.cpp src/clock.cpp src/platform.cpp src/clock_network.cpp src/tracking.cpp tests/platform_tests.cpp -lwinhttp -luser32 -ladvapi32 -lws2_32 -o build/platform_tests.exe
   if($LASTEXITCODE) { throw 'Platform test compilation failed' }
   & ./build/platform_tests.exe
   if($LASTEXITCODE) { throw 'Platform tests failed; application build blocked' }
@@ -23,7 +27,7 @@ try {
   & ./build/render_tests.exe
   if($LASTEXITCODE) { throw 'Renderer tests failed; application build blocked' }
   if(!$TestsOnly) {
-    & $Zig c++ @common -municode '-Wl,--subsystem,windows' src/core.cpp src/clock.cpp src/platform.cpp src/clock_network.cpp src/render.cpp src/main.cpp build/app.res -lwinhttp -ld2d1 -ldwrite -lgdi32 -luser32 -lshell32 -ladvapi32 -lole32 -lshlwapi -lws2_32 -o build/SanctuaryTimers.exe
+    & $Zig c++ @common -municode '-Wl,--subsystem,windows' src/core.cpp src/clock.cpp src/platform.cpp src/clock_network.cpp src/tracking.cpp src/render.cpp src/main.cpp build/app.res -lwinhttp -ld2d1 -ldwrite -lgdi32 -luser32 -lshell32 -ladvapi32 -lole32 -lshlwapi -lws2_32 -o build/SanctuaryTimers.exe
     if($LASTEXITCODE) { throw 'Application compilation failed' }
   }
 } finally { Pop-Location }

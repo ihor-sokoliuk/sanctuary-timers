@@ -25,6 +25,8 @@ The [release page](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/la
 
 Place `SanctuaryTimers.exe` in a writable folder you intend to keep, then run it. Use Diablo IV in Windowed Fullscreen. The panel appears when Diablo is foreground and hides when another application takes focus.
 
+Game launch and restore detection uses Windows notifications, with short bounded retries while the window is initializing. It does not continuously poll for focus or activate the game for you.
+
 The left strip contains collapse/expand, drag, and settings. The timer area lets clicks pass to the game. Settings open inside the panel: adjust text size, width, and background opacity with the minus/plus controls. Text stays opaque. Appearance and position are saved beside the executable.
 
 All text, including event names, timers and appearance settings, uses embedded PT Serif Bold with a subtle dark shadow to match the game's serif UI style. No system font installation is needed.
