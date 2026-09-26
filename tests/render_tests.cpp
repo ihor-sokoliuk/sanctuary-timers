@@ -52,6 +52,27 @@ int main(int argc,char** argv){
  unsigned maxAlpha=0;for(size_t i=57;i<bytes.size();i+=4)maxAlpha=std::max(maxAlpha,unsigned(bytes[i]));
  auto backgroundAlpha=bytes[54+(15*270+140)*4+3];REQUIRE(maxAlpha>=250&&backgroundAlpha>=20&&backgroundAlpha<=32);
  std::filesystem::remove(path);
+ // Event identity colors must remain on both text columns, including cached estimates.
+ Preferences colored{15,241,75};auto coloredLayout=layout(colored,false);constexpr Time now=1790366400;
+ const unsigned expectedColors[]={0xdfa89d,0xf2b566,0xa7bfca};
+ for(int state=0;state<3;++state){
+  std::array<Record,3> records{{{now+2100,now+14700,0,now,true,false},{now,0,now+3300,now,true,false},{now+420,now+1920,0,now,true,false}}};
+  if(state==1)for(auto& record:records)record.failed=true;
+  if(state==2)records={};
+  REQUIRE(r.draw(hwnd,colored,false,records,now,1.f,{0,0,coloredLayout.width,coloredLayout.height},L""));
+  if(argc==3&&std::string(argv[1])=="--cached-preview"&&state==1)REQUIRE(r.saveBitmap(std::filesystem::path(argv[2]).wstring()));
+  REQUIRE(r.saveBitmap(path.wstring()));std::ifstream pixelsFile(path,std::ios::binary);std::vector<unsigned char> pixels((std::istreambuf_iterator<char>(pixelsFile)),{});pixelsFile.close();std::filesystem::remove(path);
+  for(int row=0;row<3;++row)for(int column=0;column<2;++column){
+   int left=column?coloredLayout.width-coloredLayout.timeWidth-8:58;
+   int width=column?coloredLayout.timeWidth:coloredLayout.labelWidth;unsigned matches=0;
+   for(int y=4+row*coloredLayout.row;y<4+(row+1)*coloredLayout.row;++y)for(int x=left;x<left+width;++x){
+    size_t at=54+(static_cast<size_t>(y)*coloredLayout.width+x)*4;REQUIRE(at+3<pixels.size());
+    unsigned rgb=(unsigned(pixels[at+2])<<16)|(unsigned(pixels[at+1])<<8)|pixels[at];if(pixels[at+3]>=250&&rgb==expectedColors[row])++matches;
+   }
+   if(matches<3)std::cerr<<"Missing event color: state="<<state<<" row="<<row<<" column="<<column<<'\n';
+   REQUIRE(matches>=3);
+  }
+ }
  auto settingsLayout=layout({15,241,75},true);
  REQUIRE(r.draw(hwnd,{15,241,75},true,{},1790366400,1.5f,{0,0,settingsLayout.width*3/2,settingsLayout.height*3/2},L"Timers calculated locally",L"Clock: synced 1440 min ago (daily)"));
  if(argc==2)REQUIRE(r.saveBitmap(std::filesystem::path(argv[1]).wstring()));

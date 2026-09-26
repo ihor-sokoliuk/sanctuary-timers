@@ -29,7 +29,7 @@ The left strip contains collapse/expand, drag, and settings. The timer area lets
 
 All text, including event names, timers and appearance settings, uses embedded PT Serif Bold with a subtle dark shadow to match the game's serif UI style. No system font installation is needed.
 
-Each event name matches its countdown color: red for World Boss, orange for Helltide, and blue-gray for Legion. Estimated/offline names and countdowns share the muted estimate color.
+Each event name matches its countdown color: red for World Boss, yellow-orange for Helltide, and blue-gray for Legion. These colors remain the same for cached/offline estimates; the `~` prefix identifies estimates without changing the event color.
 
 Panel width adjusts in 5-pixel steps. Its minimum follows the text size, reserving enough room for all labels and countdowns plus an 8-pixel gap between their columns. At 15-pixel text the minimum panel width is 241 logical pixels; larger text raises that limit to avoid clipping.
 

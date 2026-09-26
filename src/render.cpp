@@ -84,7 +84,7 @@ bool Renderer::draw(HWND hwnd,Preferences p,bool settings,const std::array<Recor
   color(0xa7b2c4);target_->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(14,h-14),5,5),brush_,1.3f);target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(14,h-14),1.7f,1.7f),brush_);
   for(int i=0;i<4;++i){float dx=i<2?(i?7.f:-7.f):0,dy=i>=2?(i==2?-7.f:7.f):0;line(14+dx*.7f,h-14+dy*.7f,14+dx,h-14+dy,0xa7b2c4,1.3f);}
   if(!p.collapsed){const wchar_t* names[]={L"World Boss",L"Helltide",L"Legion"};unsigned colors[]={0xdfa89d,0xf2b566,0xa7bfca};
-   for(int i=0;i<3;++i){float y=4.f+i*l.row;auto v=calculate(Kind(i),records[i],now);unsigned rowColor=v.estimated?0xa8b2c3:colors[i];icon(i,42,y+l.row/2.f,colors[i]);text(names[i],58,y,static_cast<float>(l.labelWidth),static_cast<float>(l.row),static_cast<float>(p.font),rowColor);
+   for(int i=0;i<3;++i){float y=4.f+i*l.row;auto v=calculate(Kind(i),records[i],now);unsigned rowColor=colors[i];icon(i,42,y+l.row/2.f,colors[i]);text(names[i],58,y,static_cast<float>(l.labelWidth),static_cast<float>(l.row),static_cast<float>(p.font),rowColor);
     auto value=formatTime(v);if(i==1)value=(v.active?L"ends ":L"in ")+value;
     text(value,w-l.timeWidth-8,y,static_cast<float>(l.timeWidth),static_cast<float>(l.row),static_cast<float>(p.font),rowColor,true,true);
    }
