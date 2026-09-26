@@ -25,4 +25,14 @@ Read-only review caught registry key replacement, retained-state reinstall, and 
 
 The first published installer (0.1.1) stopped before replacing any application files: Windows PowerShell 5.1 `Start-Process` appended a trailing space to its control argument, which the native application rejected. Version 0.1.2 uses a hidden direct process launch to preserve the exact argument. A real executable regression fixture reproduces the original failure and verifies the corrected command and exit code; this brings the installer suite to 14 cases.
 
-Corrected release publication and downloaded-build installation verification pending.
+Version [0.1.2](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/tag/v0.1.2) was published from commit `892a94ddefcd9a44778135423c271de4c1fe01e5`. [Windows CI](https://github.com/ihor-sokoliuk/sanctuary-timers/actions/runs/36204853848) passed the native suites and all 14 installer cases. The release assets came from that CI run. The installer was downloaded from the published release, matched against the tested artifact, and executed using Windows PowerShell 5.1.
+
+Installation and passive live verification on September 25, 2026 confirmed:
+
+- The installed executable under `%LOCALAPPDATA%\Programs\SanctuaryTimers` reports version 0.1.2 and matches the executable inside the published ZIP. Its SHA-256 is `A2C3AC579F2B7CA110586C2EDD075A280871D647E20F15F8C938FA3360C8CEA2`.
+- Exactly one overlay process is running. Its parent is the Windows service host containing the Schedule service, with `services.exe` above it; no installer or Codex process is in its ancestry. The same application process remained responsive after the installer exited.
+- The launch task is running with an interactive user token, no automatic triggers and no execution time limit. The quoted Run entry points to the installed executable. Start menu and Installed apps entries resolve to this installation.
+- The settings file is byte-for-byte unchanged. All six unrelated Run values and the app's Task Manager startup-state metadata are unchanged. Existing cached records were migrated, and the previous portable folder remains available.
+- After a natural return to Diablo, both overlay windows became visible with the expected no-activate/topmost styles, 361-by-133 physical-pixel panel at 150% scale, and contained controls. Diablo remained foreground during this observation. Each event record refreshed successfully once; all three records were verified, with no HTTP failures or drawing errors.
+
+No input was synthesized and no window was deliberately focused. Windows sign-in/reboot and closing Codex were not performed; startup registration and independent process ownership were verified without interrupting the active session. Version 0.1.1 is marked superseded on its release page.
