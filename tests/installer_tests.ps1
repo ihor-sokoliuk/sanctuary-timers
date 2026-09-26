@@ -15,6 +15,16 @@ function Make-Zip([string[]]$Names) {
     return $zipPath
 }
 try {
+    Test 'hidden control launch preserves exact native arguments and exit code' {
+        $controlFixture=Join-Path $fixture 'ControlArguments.exe'
+        Add-Type -OutputAssembly $controlFixture -OutputType WindowsApplication @'
+using System;
+public class ControlArguments {
+    public static int Main() { return Environment.CommandLine.EndsWith(" --status",StringComparison.Ordinal) ? 42 : 2; }
+}
+'@
+        Check ((Invoke-OverlayCommand $controlFixture '--status') -eq 42)
+    }
     $release = @{ tag_name='v0.1.1'; draft=$false; prerelease=$false; assets=@(
         @{name='SanctuaryTimers-0.1.1-win-x64.zip';browser_download_url='https://github.com/ihor-sokoliuk/sanctuary-timers/releases/download/v0.1.1/SanctuaryTimers-0.1.1-win-x64.zip'},
         @{name='SHA256SUMS.txt';browser_download_url='https://github.com/ihor-sokoliuk/sanctuary-timers/releases/download/v0.1.1/SHA256SUMS.txt'}) }

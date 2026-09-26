@@ -15,7 +15,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-Sanct
 
 The installer downloads the latest stable release, verifies its SHA-256 checksum, and installs it into `%LOCALAPPDATA%\Programs\SanctuaryTimers`. It adds a Start menu entry and an entry under Windows Installed apps. An on-demand Task Scheduler task launches it independently of the installer, terminal, or Codex. No administrator password is needed.
 
-Automatic startup remains under **Task Manager > Startup apps > Sanctuary Timers**. The task has no automatic triggers, so disabling startup in Task Manager is respected. Existing settings and cache survive updates. To move a previous portable copy, add `-MigrateFrom 'C:\path\to\portable-folder'`; use `-Version 0.1.1` to select a release or `-NoStart` to install without launching it.
+Automatic startup remains under **Task Manager > Startup apps > Sanctuary Timers**. The task has no automatic triggers, so disabling startup in Task Manager is respected. Existing settings and cache survive updates. To move a previous portable copy, add `-MigrateFrom 'C:\path\to\portable-folder'`; use `-Version 0.1.2` to select a release or `-NoStart` to install without launching it.
 
 Run the installer again to update. Uninstall through Windows Installed apps, or run the installed script with `-Uninstall`. Uninstall preserves preferences/cache and an ownership marker, allowing a later reinstall. Failed updates retain `SanctuaryTimers.previous.exe` for recovery; if rollback cannot finish, the installer reports that path.
 

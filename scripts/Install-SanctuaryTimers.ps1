@@ -85,13 +85,23 @@ function Get-OverlayProcesses {
     $session=(Get-Process -Id $PID).SessionId
     @(Get-CimInstance Win32_Process -Filter "Name='SanctuaryTimers.exe'" | Where-Object SessionId -eq $session)
 }
+function Invoke-OverlayCommand {
+    param([string]$Executable,[string]$Command)
+    # Windows PowerShell 5.1 Start-Process appends a space to the raw command tail.
+    $info=New-Object Diagnostics.ProcessStartInfo
+    $info.FileName=$Executable;$info.Arguments=$Command;$info.UseShellExecute=$false
+    $info.CreateNoWindow=$true;$info.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
+    $probe=[Diagnostics.Process]::Start($info)
+    try {if(!$probe.WaitForExit(10000)){throw 'Overlay control command timed out'};return $probe.ExitCode}
+    finally {$probe.Dispose()}
+}
 function Stop-OwnedOverlay {
     param([string[]]$AllowedPaths)
     foreach($app in @(Get-OverlayProcesses)){
         if(!$app.ExecutablePath -or $AllowedPaths -inotcontains $app.ExecutablePath){throw 'Another copy of Sanctuary Timers is running; exit it before installing'}
         $process=Get-Process -Id $app.ProcessId -ErrorAction Stop
-        $quit=Start-Process -FilePath $app.ExecutablePath -ArgumentList '--quit' -WindowStyle Hidden -PassThru -Wait
-        if($quit.ExitCode -ne 0 -or !$process.WaitForExit(10000)){throw 'Overlay did not exit; files have not been replaced'}
+        $quit=Invoke-OverlayCommand $app.ExecutablePath '--quit'
+        if($quit -ne 0 -or !$process.WaitForExit(10000)){throw 'Overlay did not exit; files have not been replaced'}
     }
 }
 function Get-LaunchTaskName { 'Sanctuary Timers - '+[Security.Principal.WindowsIdentity]::GetCurrent().User.Value }
@@ -119,8 +129,8 @@ function Start-InstalledOverlay {
         if($found.Count -eq 1){
             $status=Join-Path (Split-Path $Executable -Parent) 'status.txt'
             if(Test-Path -LiteralPath $status){Remove-Item -LiteralPath $status -Force}
-            $probe=Start-Process -FilePath $Executable -ArgumentList '--status' -WindowStyle Hidden -PassThru -Wait
-            if($probe.ExitCode -eq 0){
+            $probe=Invoke-OverlayCommand $Executable '--status'
+            if($probe -eq 0){
                 for($attempt=0;$attempt -lt 20;$attempt++){if(Test-Path -LiteralPath $status){return $found[0].ProcessId};Start-Sleep -Milliseconds 100}
             }
         }
