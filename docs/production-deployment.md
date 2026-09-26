@@ -23,6 +23,39 @@ preservation of unrelated values. These tests use temporary test keys, never the
 production Run key. Live installation and sign-in verification must be recorded
 separately; test success alone does not prove a future reboot.
 
+### 0.1.6 deployment evidence
+
+Release [0.1.6](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/tag/v0.1.6)
+was published from `e02816f0bba9dec02d3e41b838c8c8b36a8a56a7` after focused review
+and successful [Windows CI](https://github.com/ihor-sokoliuk/sanctuary-timers/actions/runs/36272789824).
+Local and CI verification passed all five native suites and 21 installer cases.
+The installer was downloaded from the release, checked against the tested CI
+artifact, then executed under Windows PowerShell 5.1 with `-RepairStartup`.
+
+Passive checks on September 26 confirmed:
+
+- Windows' registry provider and startup inventory both now report the quoted
+  installed executable; both had reported it missing before repair. All seven
+  unrelated Run values and all existing Task Manager startup metadata are unchanged.
+- The installed executable reports 0.1.6 and matches the published ZIP, SHA-256
+  `FC9BF371B98F717E613D77BF070FB4B52134816128A6070DD7D9DF7B1902A582`.
+  Windows' independent filesystem provider also sees version 0.1.6.0. The prior
+  0.1.5 executable remains as the verified rollback backup.
+- Exactly one responsive overlay runs under Windows' Schedule service, with no
+  Codex or installer ancestor. The task retains zero automatic triggers and no
+  runtime limit. The installer completed before these checks.
+- Diablo retained foreground across installation. Both overlay windows became
+  visible at the saved 345-by-129 physical-pixel size, with topmost/no-activate
+  styles and a click-through display. Preferences are byte-for-byte unchanged.
+- Discovery hooks are healthy, the game is recognized, and no drawing errors are
+  reported. The first clock check succeeded with a -312 ms correction and 34 ms
+  round trip. Each event record refreshed once successfully, with no failures.
+
+No input was synthesized, and neither Diablo nor Windows was restarted. A new
+sign-in/reboot and a fresh Diablo launch remain unobserved; the live evidence
+proves repaired Windows-visible registration and a working overlay in the current
+game session, not those future transitions.
+
 The user authorized publishing a production release and installing it on this Windows machine independently of Codex. Preserve the current appearance, timing cache and Task Manager startup control. Do not synthesize input or restart Diablo.
 
 ## Delivery plan
