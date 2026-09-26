@@ -17,6 +17,8 @@ The installer downloads the latest stable release, verifies its SHA-256 checksum
 
 Automatic startup remains under **Task Manager > Startup apps > Sanctuary Timers**. The task has no automatic triggers, so disabling startup in Task Manager is respected. Existing settings and cache survive updates. To move a previous portable copy, add `-MigrateFrom 'C:\path\to\portable-folder'`; use `-Version 0.1.3` to select a release or `-NoStart` to install without launching it.
 
+The installed app starts at Windows sign-in and waits in the background for Diablo IV. It shows the overlay when the game becomes active, including when Diablo opens later in the session. Updates replace the executable at the same installed path, so startup uses the deployed version.
+
 Run the installer again to update. Uninstall through Windows Installed apps, or run the installed script with `-Uninstall`. Uninstall preserves preferences/cache and an ownership marker, allowing a later reinstall. Failed updates retain `SanctuaryTimers.previous.exe` for recovery; if rollback cannot finish, the installer reports that path.
 
 The [release page](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/latest) also provides a portable ZIP and checksum manifest.
@@ -40,6 +42,14 @@ There are no sounds, popups, flashing alerts, maps, or build tools. `Now` means 
 ## Start with Windows or exit
 
 The installer (or first normal portable launch) adds **Sanctuary Timers** under **Task Manager > Startup apps**. Disable it there to stop automatic startup. The app and installer updates preserve that choice and do not recreate an entry you remove. If you move a portable folder, run the app once from the new location to update an existing startup path.
+
+If a previous installation never appeared in Windows startup, download the current installer and run it with `-RepairStartup`:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-SanctuaryTimers.ps1" -RepairStartup
+```
+
+The installer reads and verifies startup through Windows' registry service, including when its host has an isolated registry view. The repair option explicitly restores a missing entry. It does not override a **Disabled** setting in Task Manager; enable that setting there if desired. Ordinary updates continue to preserve a deliberately removed entry.
 
 Right-click the tray icon to open appearance settings or exit. Starting it a second time does not create another panel. `SanctuaryTimers.exe --quit` also requests a graceful exit without changing focus.
 

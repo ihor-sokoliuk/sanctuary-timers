@@ -1,5 +1,28 @@
 # Production deployment
 
+## Startup verification correction
+
+After a September 26 reboot, the installed 0.1.5 executable was present but no
+overlay process had started. Explorer's startup events contained no launch attempt.
+The host's registry view showed the Run entry, while Windows' `StdRegProv` and
+`Win32_StartupCommand` providers did not. Earlier deployment checks below used
+the host's view and therefore did not establish that Explorer could see the entry.
+The independent on-demand launch checks remain valid.
+
+Version 0.1.6 changes the installer to read/write the signed-in user's Run entry
+through Windows' registry provider and require successful readback. It does not
+fall back to a potentially isolated host view. An explicit `-RepairStartup`
+option restores a missing registration while preserving Task Manager disablement;
+ordinary updates still preserve a deliberately removed entry. Uninstall removes
+only the matching owned value from Windows and cleans up a matching legacy host
+entry. Neither path replaces the Run key or adds another automatic launch trigger.
+
+Regression coverage includes provider/transport failures, explicit repair versus
+normal update policy, readback mismatch, real Windows registry roundtrips and
+preservation of unrelated values. These tests use temporary test keys, never the
+production Run key. Live installation and sign-in verification must be recorded
+separately; test success alone does not prove a future reboot.
+
 The user authorized publishing a production release and installing it on this Windows machine independently of Codex. Preserve the current appearance, timing cache and Task Manager startup control. Do not synthesize input or restart Diablo.
 
 ## Delivery plan

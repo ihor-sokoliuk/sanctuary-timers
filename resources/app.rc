@@ -4,8 +4,8 @@
 102 RCDATA "resources/fonts/PT_Serif-Web-Bold.ttf"
 103 RCDATA "resources/fonts/OFL.txt"
 1 VERSIONINFO
-FILEVERSION 0,1,5,0
-PRODUCTVERSION 0,1,5,0
+FILEVERSION 0,1,6,0
+PRODUCTVERSION 0,1,6,0
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_APP
 BEGIN
@@ -15,8 +15,8 @@ BEGIN
   BEGIN
    VALUE "FileDescription", "Sanctuary Timers\0"
    VALUE "ProductName", "Sanctuary Timers\0"
-   VALUE "FileVersion", "0.1.5\0"
-   VALUE "ProductVersion", "0.1.5\0"
+   VALUE "FileVersion", "0.1.6\0"
+   VALUE "ProductVersion", "0.1.6\0"
    VALUE "OriginalFilename", "SanctuaryTimers.exe\0"
   END
  END

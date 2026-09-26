@@ -40,6 +40,69 @@ public class ControlArguments {
     Test 'reject case insensitive duplicate entries' { $unsafe=Make-Zip @('SanctuaryTimers.exe','SANCTUARYTIMERS.EXE','LICENSE');Reject {Get-SafePackageEntries $unsafe (Join-Path $fixture 'stage')} }
     Test 'reject archives without the executable' { $unsafe=Make-Zip @('README.md');Reject {Get-SafePackageEntries $unsafe (Join-Path $fixture 'stage')} }
     Test 'startup update preserves deliberate deletion' { Check ((Get-StartupAction $false $false $false) -eq 'Create');Check ((Get-StartupAction $true $false $false) -eq 'None');Check ((Get-StartupAction $true $true $false) -eq 'Update');Check ((Get-StartupAction $true $true $true) -eq 'None') }
+    Test 'explicit startup repair recreates a missing registration' {
+        Check ((Get-StartupAction $true $false $false $true) -eq 'Create')
+        Check ((Get-StartupAction $true $true $true $true) -eq 'None')
+    }
+    Test 'Windows registry provider targets this user and rejects access errors' {
+        Get-Command Invoke-WindowsUserRegistry -ErrorAction Stop | Out-Null
+        $script:testRegistryCall=$null
+        function Invoke-CimMethod {
+            param($Namespace,$ClassName,$MethodName,$Arguments,$ErrorAction,$OperationTimeoutSec)
+            $script:testRegistryCall=@{Namespace=$Namespace;ClassName=$ClassName;Arguments=$Arguments}
+            [pscustomobject]@{ReturnValue=5}
+        }
+        Reject {Invoke-WindowsUserRegistry 'EnumValues' 'Software\Fixture' -AllowMissing}
+        Check ($script:testRegistryCall.Namespace -eq 'root/default');Check ($script:testRegistryCall.ClassName -eq 'StdRegProv')
+        Check ($script:testRegistryCall.Arguments.hDefKey -eq [uint32]2147483651)
+        Check ($script:testRegistryCall.Arguments.sSubKeyName -eq ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value+'\Software\Fixture'))
+    }
+    Test 'Windows registry provider propagates transport errors' {
+        Get-Command Invoke-WindowsUserRegistry -ErrorAction Stop | Out-Null
+        function Invoke-CimMethod {throw 'Provider unavailable'}
+        Reject {Invoke-WindowsUserRegistry 'EnumValues' 'Software\Fixture' -AllowMissing}
+    }
+    Test 'Windows registry read failures cannot be mistaken for absent values' {
+        Get-Command Get-WindowsRegistryString -ErrorAction Stop | Out-Null
+        function Invoke-CimMethod { [pscustomobject]@{ReturnValue=1} }
+        Reject {Get-WindowsRegistryString 'Software\Fixture' 'Missing'}
+    }
+    Test 'startup repair uses Windows state and preserves ordinary deletion' {
+        $script:testStartup=$null;$script:testStartupWrites=0
+        function Get-WindowsRegistryString {return $script:testStartup}
+        function Set-WindowsRegistryString {param($Key,$Name,$Value);Check ($Name -eq 'Sanctuary Timers');$script:testStartup=$Value;$script:testStartupWrites++}
+        Check ((Register-WindowsStartup 'C:\Program Files\SanctuaryTimers.exe' $true $false) -eq 'None')
+        Check ($script:testStartupWrites -eq 0)
+        Check ((Register-WindowsStartup 'C:\Program Files\SanctuaryTimers.exe' $true $true) -eq 'Create')
+        Check ($script:testStartup -ceq '"C:\Program Files\SanctuaryTimers.exe"')
+        Check ((Register-WindowsStartup 'C:\Program Files\SanctuaryTimers.exe' $true $false) -eq 'None')
+        Check ((Register-WindowsStartup 'C:\New\SanctuaryTimers.exe' $true $false) -eq 'Update')
+        Check ($script:testStartupWrites -eq 2)
+    }
+    Test 'Windows registry write requires successful independent readback' {
+        Get-Command Set-WindowsRegistryString -ErrorAction Stop | Out-Null
+        function Invoke-WindowsUserRegistry { [pscustomobject]@{ReturnValue=0} }
+        function Get-WindowsRegistryString {return 'stale command'}
+        Reject {Set-WindowsRegistryString 'Software\Fixture' 'Sanctuary Timers' 'new command'}
+    }
+    Test 'real Windows registry roundtrip preserves unrelated values and owned removal' {
+        $key='Software\SanctuaryInstallerTests-'+[guid]::NewGuid().ToString('N')
+        try {
+            Check ($null -eq (Get-WindowsRegistryString $key 'Missing'))
+            Set-WindowsRegistryString $key 'OtherApp' 'keep this'
+            Set-WindowsRegistryString $key 'Sanctuary Timers' '"C:\Old\SanctuaryTimers.exe"'
+            Set-WindowsRegistryString $key 'Sanctuary Timers' '"C:\New\SanctuaryTimers.exe"'
+            # An independent Windows provider, not PowerShell's potentially isolated HKCU view.
+            $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+            $read=Invoke-CimMethod -Namespace root/default -ClassName StdRegProv -MethodName GetStringValue -Arguments @{hDefKey=[uint32]2147483651;sSubKeyName=($sid+'\'+$key);sValueName='Sanctuary Timers'}
+            Check ($read.ReturnValue -eq 0);Check ($read.sValue -ceq '"C:\New\SanctuaryTimers.exe"')
+            Remove-WindowsRegistryStringIfOwned $key 'Sanctuary Timers' '"C:\Wrong\SanctuaryTimers.exe"'
+            Check ((Get-WindowsRegistryString $key 'Sanctuary Timers') -ceq $read.sValue)
+            Remove-WindowsRegistryStringIfOwned $key 'Sanctuary Timers' $read.sValue
+            Check ($null -eq (Get-WindowsRegistryString $key 'Sanctuary Timers'))
+            Check ((Get-WindowsRegistryString $key 'OtherApp') -ceq 'keep this')
+        } finally {Invoke-WindowsUserRegistry 'DeleteKey' $key -AllowMissing | Out-Null}
+    }
     Test 'registry initialization preserves other startup values' {
         $key='HKCU:\Software\SanctuaryInstallerTests-'+[guid]::NewGuid().ToString('N')
         try {Check ($null -eq (Get-RegistryValue $key 'Missing'));Initialize-RegistryKey $key;Check ($null -eq (Get-RegistryValue $key 'Missing'));New-ItemProperty -LiteralPath $key -Name OtherApp -Value 'keep this' | Out-Null;Initialize-RegistryKey $key;Check ((Get-RegistryValue $key OtherApp) -eq 'keep this')}finally{if(Test-Path -LiteralPath $key){Remove-Item -LiteralPath $key}}

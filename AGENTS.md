@@ -144,6 +144,9 @@ Installer changes also require Windows PowerShell 5.1:
    enabled/disabled choice. Verify the installed EXE version/hash against the release,
    one responsive process, correct startup path, independent Windows parent and
    survival after the installer exits. Check actual clock/event health, not only task status.
+   Verify startup through `StdRegProv` against the current user's `HKEY_USERS` hive
+   and `Win32_StartupCommand`, not only the host's HKCU view. Packaged hosts can
+   expose private registry entries that Explorer never sees at sign-in.
 6. Record relevant evidence and limitations in `docs/validation.md` or
    `docs/production-deployment.md`. Distinguish unit/CI success from live verification;
    do not claim reboot, sign-in, game visibility or a full-day cycle without observing it.
@@ -156,6 +159,10 @@ Installer changes also require Windows PowerShell 5.1:
 - Windows sign-in startup uses the quoted EXE path in the current user's Run value
   **Sanctuary Timers**. Task Manager remains authoritative; never change its
   `StartupApproved` metadata to override disablement.
+- The managed installer uses the Windows registry provider for startup reads,
+  writes and readback. Provider failures are errors, not missing entries. Use
+  `-RepairStartup` only when restoration of a missing entry is requested; ordinary
+  updates preserve deletion. Repair still preserves Task Manager disablement.
 - The **Sanctuary Timers - <current-user SID>** scheduled task is an on-demand
   independent launcher with an interactive user token, no automatic triggers, no
   runtime limit and battery operation allowed. Do not add a second automatic startup

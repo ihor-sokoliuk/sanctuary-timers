@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SanctuaryTimers VERSION 0.1.5 LANGUAGES CXX RC)
+project(SanctuaryTimers VERSION 0.1.6 LANGUAGES CXX RC)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT WIN32)

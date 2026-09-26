@@ -5,6 +5,7 @@ param(
     [string]$InstallDirectory = (Join-Path $env:LOCALAPPDATA 'Programs\SanctuaryTimers'),
     [string]$MigrateFrom,
     [switch]$NoStart,
+    [switch]$RepairStartup,
     [switch]$Uninstall
 )
 
@@ -45,8 +46,8 @@ function Get-SafePackageEntries {
     } finally { $zip.Dispose() }
 }
 function Get-StartupAction {
-    param([bool]$Registered,[bool]$Exists,[bool]$SamePath)
-    if(!$Exists){if($Registered){return 'None'};return 'Create'}
+    param([bool]$Registered,[bool]$Exists,[bool]$SamePath,[bool]$Repair=$false)
+    if(!$Exists){if($Registered -and !$Repair){return 'None'};return 'Create'}
     if($SamePath){return 'None'};return 'Update'
 }
 function Initialize-RegistryKey {
@@ -58,6 +59,50 @@ function Get-RegistryValue {
     if(!(Test-Path -LiteralPath $Path)){return $null}
     $key=Get-Item -LiteralPath $Path -ErrorAction Stop
     return $key.GetValue($Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+}
+function Invoke-WindowsUserRegistry {
+    param([string]$Method,[string]$SubKey,[hashtable]$Values=@{},[switch]$AllowMissing)
+    # A packaged host can expose a private HKCU view. Ask Windows' out-of-process
+    # registry provider for this user's real hive; never fall back to that private view.
+    $arguments=@{hDefKey=[uint32]2147483651;sSubKeyName=([Security.Principal.WindowsIdentity]::GetCurrent().User.Value+'\'+$SubKey)}
+    foreach($name in $Values.Keys){$arguments[$name]=$Values[$name]}
+    $result=Invoke-CimMethod -Namespace root/default -ClassName StdRegProv -MethodName $Method -Arguments $arguments -OperationTimeoutSec 10 -ErrorAction Stop
+    if($result.ReturnValue -ne 0 -and !($AllowMissing -and $result.ReturnValue -eq 2)){throw "Windows registry $Method failed ($($result.ReturnValue)); startup was not verified"}
+    return $result
+}
+function Get-WindowsRegistryString {
+    param([string]$SubKey,[string]$Name)
+    $values=Invoke-WindowsUserRegistry 'EnumValues' $SubKey -AllowMissing
+    if($values.ReturnValue -eq 2){return $null}
+    for($index=0;$index -lt $values.sNames.Count;$index++){
+        if($values.sNames[$index] -ieq $Name){
+            if($values.Types[$index] -ne 1){throw "Unexpected registry type for $Name"}
+            return (Invoke-WindowsUserRegistry 'GetStringValue' $SubKey @{sValueName=$Name}).sValue
+        }
+    }
+    return $null
+}
+function Set-WindowsRegistryString {
+    param([string]$SubKey,[string]$Name,[string]$Value)
+    Invoke-WindowsUserRegistry 'CreateKey' $SubKey | Out-Null
+    Invoke-WindowsUserRegistry 'SetStringValue' $SubKey @{sValueName=$Name;sValue=$Value} | Out-Null
+    if((Get-WindowsRegistryString $SubKey $Name) -cne $Value){throw "Windows registry readback failed for $Name"}
+}
+function Remove-WindowsRegistryStringIfOwned {
+    param([string]$SubKey,[string]$Name,[string]$Expected)
+    if((Get-WindowsRegistryString $SubKey $Name) -ieq $Expected){
+        Invoke-WindowsUserRegistry 'DeleteValue' $SubKey @{sValueName=$Name} | Out-Null
+        if($null -ne (Get-WindowsRegistryString $SubKey $Name)){throw "Windows registry removal failed for $Name"}
+    }
+}
+function Register-WindowsStartup {
+    param([string]$Executable,[bool]$Registered,[bool]$Repair)
+    $key='Software\Microsoft\Windows\CurrentVersion\Run';$name='Sanctuary Timers'
+    $old=Get-WindowsRegistryString $key $name;$command='"'+$Executable+'"'
+    $action=Get-StartupAction $Registered ($null -ne $old) ($old -ieq $command) $Repair
+    if($action -ne 'None'){Set-WindowsRegistryString $key $name $command}
+    # Do not touch StartupApproved. Even explicit repair preserves Task Manager disablement.
+    return $action
 }
 function Get-InstallationState {
     param([string]$Directory)
@@ -148,6 +193,8 @@ function Invoke-Uninstall {
     $service=New-Object -ComObject 'Schedule.Service';$service.Connect();$root=$service.GetFolder('\');$name=Get-LaunchTaskName
     $task=$null;try{$task=$root.GetTask($name)}catch{if($_.Exception.HResult -ne -2147024894){throw}}
     if($task -and $task.Definition.Actions.Item(1).Path -ieq $exe){$root.DeleteTask($name,0)}
+    Remove-WindowsRegistryStringIfOwned 'Software\Microsoft\Windows\CurrentVersion\Run' 'Sanctuary Timers' ('"'+$exe+'"')
+    # Remove a matching private entry left by an older installer as well.
     $run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
     if((Get-RegistryValue $run 'Sanctuary Timers') -eq ('"'+$exe+'"')){Remove-ItemProperty -LiteralPath $run -Name 'Sanctuary Timers'}
     $uninstallKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SanctuaryTimers'
@@ -160,7 +207,7 @@ function Invoke-Uninstall {
     Write-Host "Uninstalled. Your preferences and cache remain in $Directory"
 }
 function Invoke-Install {
-    param([string]$RequestedVersion,[string]$Directory,[string]$PreviousDirectory,[bool]$SkipStart)
+    param([string]$RequestedVersion,[string]$Directory,[string]$PreviousDirectory,[bool]$SkipStart,[bool]$Repair=$false)
     if(![Environment]::Is64BitOperatingSystem){throw 'Windows x64 is required'}
     if($RequestedVersion -ne 'latest' -and $RequestedVersion -notmatch '^v?\d+\.\d+\.\d+$'){throw 'Use latest or a version such as 0.1.1'}
     $uri='https://api.github.com/repos/ihor-sokoliuk/sanctuary-timers/releases/'
@@ -190,11 +237,7 @@ function Invoke-Install {
         try {
             foreach($file in $files){$target=Join-Path $Directory $file;[void][IO.Directory]::CreateDirectory((Split-Path $target -Parent));Copy-Item -LiteralPath (Join-Path $expanded $file) -Destination $target -Force}
             if($PreviousDirectory){foreach($state in @('settings.ini','events.ini')){$from=Join-Path $PreviousDirectory $state;$to=Join-Path $Directory $state;if((Test-Path -LiteralPath $from) -and !(Test-Path -LiteralPath $to)){Copy-Item -LiteralPath $from -Destination $to}}}
-            $run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';Initialize-RegistryKey $run
-            $oldRun=Get-RegistryValue $run 'Sanctuary Timers'
-            $command='"'+$exe+'"';$action=Get-StartupAction $wasInstalled ($null -ne $oldRun) ($oldRun -eq $command)
-            if($action -ne 'None'){New-ItemProperty -LiteralPath $run -Name 'Sanctuary Timers' -Value $command -PropertyType String -Force | Out-Null}
-            # Never write StartupApproved: Task Manager's enabled/disabled choice remains authoritative.
+            $action=Register-WindowsStartup $exe $wasInstalled $Repair
             $shortcut=Join-Path ([Environment]::GetFolderPath('Programs')) 'Sanctuary Timers.lnk'
             $link=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut);$link.TargetPath=$exe;$link.WorkingDirectory=$Directory;$link.IconLocation=$exe+',0';$link.Save()
             $uninstallKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SanctuaryTimers';Initialize-RegistryKey $uninstallKey
@@ -225,4 +268,4 @@ if ($MyInvocation.InvocationName -eq '.') { return }
 $ErrorActionPreference='Stop'
 $InstallDirectory=[IO.Path]::GetFullPath($InstallDirectory).TrimEnd('\')
 if($InstallDirectory -eq [IO.Path]::GetPathRoot($InstallDirectory).TrimEnd('\') -or $InstallDirectory.StartsWith($env:WINDIR,[StringComparison]::OrdinalIgnoreCase)){throw 'Choose a dedicated application directory'}
-if($Uninstall){Invoke-Uninstall $InstallDirectory}else{Invoke-Install $Version $InstallDirectory $MigrateFrom ([bool]$NoStart)}
+if($Uninstall){Invoke-Uninstall $InstallDirectory}else{Invoke-Install $Version $InstallDirectory $MigrateFrom ([bool]$NoStart) ([bool]$RepairStartup)}
