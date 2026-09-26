@@ -36,3 +36,13 @@ Installation and passive live verification on September 25, 2026 confirmed:
 - After a natural return to Diablo, both overlay windows became visible with the expected no-activate/topmost styles, 361-by-133 physical-pixel panel at 150% scale, and contained controls. Diablo remained foreground during this observation. Each event record refreshed successfully once; all three records were verified, with no HTTP failures or drawing errors.
 
 No input was synthesized and no window was deliberately focused. Windows sign-in/reboot and closing Codex were not performed; startup registration and independent process ownership were verified without interrupting the active session. Version 0.1.1 is marked superseded on its release page.
+
+## Daily clock update: 0.1.3
+
+The user authorized daily clock synchronization, remote publication and local deployment with autostart. Version [0.1.3](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/tag/v0.1.3) was released from `a7448863945c9cfb6d9cfcd15f61c09976f3edfb`, following a focused read-only review with no material findings and successful [Windows CI](https://github.com/ihor-sokoliuk/sanctuary-timers/actions/runs/36246860907). CI passed four native suites (including 29 core and 11 clock cases) and 14 installer cases.
+
+The published installer updated the managed installation using Windows PowerShell 5.1. The installed executable exactly matches the CI release ZIP, SHA-256 `1046E58B700941E530D966180C3F9B8FA6E3FC7DE4E9602D3A7A0061B653E997`. Version 0.1.2 remains as the previous executable for rollback.
+
+The new Windows-owned process completed its first clock check while Diablo was not foreground: one successful SNTP exchange, -376 ms correction, 42 ms round trip, and next check scheduled for 86,400 seconds. Event fetches remained deferred. A later status request confirmed the same process, still only one clock request, and a decreasing daily deadline. Preferences, the quoted autostart path, Task Manager metadata and all unrelated startup values were preserved. The installer exited before these checks; the application remained responsive. No Windows time settings or foreground window were changed.
+
+Appearance text/layout was verified by offscreen rendering at 150% scaling. This deployment did not force a game focus change, sign-in/reboot, or a 24-hour live wait; injected-time tests cover the daily boundary and sleep catch-up.
