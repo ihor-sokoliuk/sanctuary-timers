@@ -4,6 +4,23 @@ A compact native Windows overlay for Diablo IV's World Boss, Helltide and Legion
 
 ![Sanctuary Timers compact panel](docs/preview.png)
 
+## Install on Windows
+
+Download and run [Install-SanctuaryTimers.ps1](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/latest/download/Install-SanctuaryTimers.ps1), or use Windows PowerShell:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/ihor-sokoliuk/sanctuary-timers/releases/latest/download/Install-SanctuaryTimers.ps1' -OutFile "$env:TEMP\Install-SanctuaryTimers.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-SanctuaryTimers.ps1"
+```
+
+The installer downloads the latest stable release, verifies its SHA-256 checksum, and installs it into `%LOCALAPPDATA%\Programs\SanctuaryTimers`. It adds a Start menu entry and an entry under Windows Installed apps. An on-demand Task Scheduler task launches it independently of the installer, terminal, or Codex. No administrator password is needed.
+
+Automatic startup remains under **Task Manager > Startup apps > Sanctuary Timers**. The task has no automatic triggers, so disabling startup in Task Manager is respected. Existing settings and cache survive updates. To move a previous portable copy, add `-MigrateFrom 'C:\path\to\portable-folder'`; use `-Version 0.1.1` to select a release or `-NoStart` to install without launching it.
+
+Run the installer again to update. Uninstall through Windows Installed apps, or run the installed script with `-Uninstall`. Uninstall preserves preferences/cache and an ownership marker, allowing a later reinstall. Failed updates retain `SanctuaryTimers.previous.exe` for recovery; if rollback cannot finish, the installer reports that path.
+
+The [release page](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/latest) also provides a portable ZIP and checksum manifest.
+
 ## Play with the overlay
 
 Place `SanctuaryTimers.exe` in a writable folder you intend to keep, then run it. Use Diablo IV in Windowed Fullscreen. The panel appears when Diablo is foreground and hides when another application takes focus.
@@ -20,7 +37,7 @@ There are no sounds, popups, flashing alerts, maps, or build tools. `Now` means 
 
 ## Start with Windows or exit
 
-The first normal launch adds **Sanctuary Timers** under **Task Manager > Startup apps**. Disable it there to stop automatic startup. The app preserves that choice and does not recreate an entry you remove. If you move its folder, run the app once from the new location to update an existing startup path.
+The installer (or first normal portable launch) adds **Sanctuary Timers** under **Task Manager > Startup apps**. Disable it there to stop automatic startup. The app and installer updates preserve that choice and do not recreate an entry you remove. If you move a portable folder, run the app once from the new location to update an existing startup path.
 
 Right-click the tray icon to open appearance settings or exit. Starting it a second time does not create another panel. `SanctuaryTimers.exe --quit` also requests a graceful exit without changing focus.
 
@@ -47,6 +64,8 @@ The build script runs unit tests before producing `build/SanctuaryTimers.exe`. I
 cmake -S . -B build-msvc -A x64
 cmake --build build-msvc --config Release
 ctest --test-dir build-msvc -C Release --output-on-failure
+.\tests\installer_tests.ps1
+.\scripts\New-ReleasePackage.ps1 -Executable .\build-msvc\Release\SanctuaryTimers.exe
 ```
 
 ## Implementation and privacy

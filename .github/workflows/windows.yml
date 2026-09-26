@@ -13,7 +13,13 @@ jobs:
         run: cmake --build build --config Release --parallel 2
       - name: Unit and offscreen rendering tests
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Installer tests (Windows PowerShell 5.1)
+        shell: powershell
+        run: .\tests\installer_tests.ps1
+      - name: Package versioned release
+        shell: powershell
+        run: .\scripts\New-ReleasePackage.ps1 -Executable .\build\Release\SanctuaryTimers.exe
       - uses: actions/upload-artifact@v4
         with:
           name: SanctuaryTimers-win-x64
-          path: build/Release/SanctuaryTimers.exe
+          path: release/*
