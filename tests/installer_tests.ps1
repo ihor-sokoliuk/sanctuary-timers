@@ -32,7 +32,7 @@ try {
     Test 'startup update preserves deliberate deletion' { Check ((Get-StartupAction $false $false $false) -eq 'Create');Check ((Get-StartupAction $true $false $false) -eq 'None');Check ((Get-StartupAction $true $true $false) -eq 'Update');Check ((Get-StartupAction $true $true $true) -eq 'None') }
     Test 'registry initialization preserves other startup values' {
         $key='HKCU:\Software\SanctuaryInstallerTests-'+[guid]::NewGuid().ToString('N')
-        try {Initialize-RegistryKey $key;New-ItemProperty -LiteralPath $key -Name OtherApp -Value 'keep this' | Out-Null;Initialize-RegistryKey $key;Check ((Get-ItemPropertyValue -LiteralPath $key -Name OtherApp) -eq 'keep this')}finally{if(Test-Path -LiteralPath $key){Remove-Item -LiteralPath $key}}
+        try {Check ($null -eq (Get-RegistryValue $key 'Missing'));Initialize-RegistryKey $key;Check ($null -eq (Get-RegistryValue $key 'Missing'));New-ItemProperty -LiteralPath $key -Name OtherApp -Value 'keep this' | Out-Null;Initialize-RegistryKey $key;Check ((Get-RegistryValue $key OtherApp) -eq 'keep this')}finally{if(Test-Path -LiteralPath $key){Remove-Item -LiteralPath $key}}
     }
     Test 'uninstall ownership state permits reinstall and preserves preferences' {
         $directory=Join-Path $fixture 'reinstall';[void][IO.Directory]::CreateDirectory($directory);Check ((Get-InstallationState $directory) -eq 'Empty')

@@ -53,6 +53,12 @@ function Initialize-RegistryKey {
     param([string]$Path)
     if(!(Test-Path -LiteralPath $Path)){New-Item -Path $Path | Out-Null}
 }
+function Get-RegistryValue {
+    param([string]$Path,[string]$Name)
+    if(!(Test-Path -LiteralPath $Path)){return $null}
+    $key=Get-Item -LiteralPath $Path -ErrorAction Stop
+    return $key.GetValue($Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+}
 function Get-InstallationState {
     param([string]$Directory)
     $marker=Join-Path $Directory 'install.json'
@@ -133,9 +139,9 @@ function Invoke-Uninstall {
     $task=$null;try{$task=$root.GetTask($name)}catch{if($_.Exception.HResult -ne -2147024894){throw}}
     if($task -and $task.Definition.Actions.Item(1).Path -ieq $exe){$root.DeleteTask($name,0)}
     $run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-    if((Get-ItemPropertyValue -LiteralPath $run -Name 'Sanctuary Timers' -ErrorAction SilentlyContinue) -eq ('"'+$exe+'"')){Remove-ItemProperty -LiteralPath $run -Name 'Sanctuary Timers'}
+    if((Get-RegistryValue $run 'Sanctuary Timers') -eq ('"'+$exe+'"')){Remove-ItemProperty -LiteralPath $run -Name 'Sanctuary Timers'}
     $uninstallKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SanctuaryTimers'
-    if((Get-ItemPropertyValue -LiteralPath $uninstallKey -Name InstallLocation -ErrorAction SilentlyContinue) -ieq $Directory){Remove-Item -LiteralPath $uninstallKey}
+    if((Get-RegistryValue $uninstallKey InstallLocation) -ieq $Directory){Remove-Item -LiteralPath $uninstallKey}
     $shortcut=Join-Path ([Environment]::GetFolderPath('Programs')) 'Sanctuary Timers.lnk'
     if(Test-Path -LiteralPath $shortcut){$link=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut);if($link.TargetPath -ieq $exe){Remove-Item -LiteralPath $shortcut -Force}}
     $prefix=$Directory.TrimEnd('\')+'\'
@@ -175,7 +181,7 @@ function Invoke-Install {
             foreach($file in $files){$target=Join-Path $Directory $file;[void][IO.Directory]::CreateDirectory((Split-Path $target -Parent));Copy-Item -LiteralPath (Join-Path $expanded $file) -Destination $target -Force}
             if($PreviousDirectory){foreach($state in @('settings.ini','events.ini')){$from=Join-Path $PreviousDirectory $state;$to=Join-Path $Directory $state;if((Test-Path -LiteralPath $from) -and !(Test-Path -LiteralPath $to)){Copy-Item -LiteralPath $from -Destination $to}}}
             $run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';Initialize-RegistryKey $run
-            $oldRun=Get-ItemPropertyValue -LiteralPath $run -Name 'Sanctuary Timers' -ErrorAction SilentlyContinue
+            $oldRun=Get-RegistryValue $run 'Sanctuary Timers'
             $command='"'+$exe+'"';$action=Get-StartupAction $wasInstalled ($null -ne $oldRun) ($oldRun -eq $command)
             if($action -ne 'None'){New-ItemProperty -LiteralPath $run -Name 'Sanctuary Timers' -Value $command -PropertyType String -Force | Out-Null}
             # Never write StartupApproved: Task Manager's enabled/disabled choice remains authoritative.
