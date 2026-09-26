@@ -3,7 +3,12 @@
 #include <iostream>
 using namespace sanctuary;
 #define REQUIRE(v) if(!(v)){std::cerr<<"FAIL line "<<__LINE__<<": "<<#v<<'\n';return 1;}
-int main() {
+int main(int argc,char** argv) {
+ if(argc==2&&std::string(argv[1])=="--live-clock"){
+  auto result=fetchClock();if(!result.sample){std::cerr<<result.error<<'\n';return 1;}
+  std::cout<<"utc_ms="<<result.sample->utcMillis<<" offset_ms="<<result.sample->offsetMillis<<" roundtrip_ms="<<result.sample->roundTripMillis<<'\n';return 0;
+ }
+ std::atomic_bool stopped{false};auto cancelled=fetchClock(&stopped);REQUIRE(!cancelled.sample&&cancelled.error=="cancelled");
  auto folder=std::filesystem::temp_directory_path()/(L"SanctuaryTimers-tests-"+std::to_wstring(GetCurrentProcessId()));
  std::filesystem::create_directories(folder);
  auto p=folder/L"settings.ini";

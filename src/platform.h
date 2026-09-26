@@ -1,10 +1,14 @@
 #pragma once
 #include "core.h"
+#include "clock.h"
 #include <filesystem>
 #include <atomic>
 #include <windows.h>
 namespace sanctuary {
 Time utcNow();
+Millis utcMillis();
+struct ClockResponse { std::optional<ClockSample> sample; std::string error; };
+ClockResponse fetchClock(const std::atomic_bool* running=nullptr);
 Preferences loadPreferences(const std::filesystem::path&);
 bool savePreferences(const std::filesystem::path&, Preferences);
 std::array<Record,3> loadCache(const std::filesystem::path&,Time now);

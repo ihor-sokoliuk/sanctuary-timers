@@ -13,8 +13,8 @@ using namespace sanctuary;
 namespace {
 constexpr wchar_t DisplayClass[]=L"SanctuaryTimersDisplay";
 constexpr wchar_t InputClass[]=L"SanctuaryTimersControls";
-constexpr UINT FocusMessage=WM_APP+1,DataMessage=WM_APP+2,StatusMessage=WM_APP+3,SnapshotMessage=WM_APP+4,TrayMessage=WM_APP+5,LocationMessage=WM_APP+6;
-constexpr UINT_PTR PaintTimer=1,NetworkTimer=2;
+constexpr UINT FocusMessage=WM_APP+1,DataMessage=WM_APP+2,StatusMessage=WM_APP+3,SnapshotMessage=WM_APP+4,TrayMessage=WM_APP+5,LocationMessage=WM_APP+6,ClockMessage=WM_APP+7;
+constexpr UINT_PTR PaintTimer=1,NetworkTimer=2,ClockTimer=3;
 HWND appWindow{};
 void CALLBACK windowEvent(HWINEVENTHOOK,DWORD event,HWND window,LONG object,LONG child,DWORD,DWORD){
  if(!appWindow)return;
@@ -25,23 +25,28 @@ struct Batch {int requested{},performed{};std::array<Response,3> response;};
 class App {
  public:
  HWND display{},input{},game{};
- Preferences prefs;Coordinator coordinator;Renderer renderer;
+ Preferences prefs;Coordinator coordinator;Renderer renderer;DailyClock clock;
  std::filesystem::path directory;
  HWINEVENTHOOK focusHook{},locationHook{},destroyHook{};
  DWORD gamePid{};float scale{1};Box bounds{};
  bool visible{},settings{},editing{},dragging{},smoke{},writable{},startupOk{},closing{};
  POINT dragStart{};int dragX{},dragY{};
  std::atomic_bool active{false};std::thread worker;
+ std::atomic_bool running{true};std::thread clockWorker;unsigned clockReads{};
  NOTIFYICONDATAW tray{};HICON trayIcon{};
  unsigned long long paints{},paintErrors{},focusChanges{};std::array<unsigned,3> reads{},failures{};
  std::wstring status=L"Waiting for Diablo IV";
  explicit App(bool test):smoke(test){directory=executablePath().parent_path();prefs=smoke?Preferences{}:loadPreferences(directory/L"settings.ini");if(!smoke)coordinator.records=loadCache(directory/L"events.ini",utcNow());}
- ~App(){active=false;if(worker.joinable())worker.join();if(focusHook)UnhookWinEvent(focusHook);if(locationHook)UnhookWinEvent(locationHook);if(destroyHook)UnhookWinEvent(destroyHook);if(tray.hWnd)Shell_NotifyIconW(NIM_DELETE,&tray);if(trayIcon)DestroyIcon(trayIcon);}
+ ~App(){active=false;running=false;if(worker.joinable())worker.join();if(clockWorker.joinable())clockWorker.join();if(focusHook)UnhookWinEvent(focusHook);if(locationHook)UnhookWinEvent(locationHook);if(destroyHook)UnhookWinEvent(destroyHook);if(tray.hWnd)Shell_NotifyIconW(NIM_DELETE,&tray);if(trayIcon)DestroyIcon(trayIcon);}
+ Millis nowMillis()const{return clock.now(utcMillis(),GetTickCount64());}
+ Time now()const{return nowMillis()/1000;}
  void log(const std::string& message){if(smoke)return;auto path=directory/L"diagnostics.log";std::error_code ec;if(std::filesystem::file_size(path,ec)>256*1024&&!ec){std::ofstream clear(path,std::ios::trunc);}std::ofstream f(path,std::ios::app);f<<utcNow()<<' '<<message<<'\n';}
  void save(){if(!smoke&&!savePreferences(directory/L"settings.ini",prefs)){status=L"Cannot save preferences";log("preferences write failed");}}
  void dump(){
   std::ofstream f(directory/L"status.txt");auto foreground=GetForegroundWindow();DWORD pid{};GetWindowThreadProcessId(foreground,&pid);
   f<<"utc="<<utcNow()<<"\nvisible="<<visible<<"\nforeground_pid="<<pid<<"\ngame_pid="<<gamePid<<"\nsettings="<<settings<<"\ncollapsed="<<prefs.collapsed<<"\nstartup_registered="<<prefs.registered<<"\nstartup_ok="<<startupOk<<"\npaints="<<paints<<"\npaint_errors="<<paintErrors<<"\nfocus_changes="<<focusChanges<<"\nscale="<<scale<<"\nx="<<bounds.x<<"\ny="<<bounds.y<<"\nwidth="<<bounds.width<<"\nheight="<<bounds.height<<"\n";
+  f<<"clock_utc_ms="<<nowMillis()<<"\nclock_reads="<<clockReads<<"\nclock_failures="<<clock.failures()<<"\nclock_synced="<<bool(clock.sample())<<"\nclock_next_ms="<<clock.untilDue(GetTickCount64())<<'\n';
+  if(clock.sample())f<<"clock_checked="<<clock.sample()->utcMillis/1000<<"\nclock_offset_ms="<<clock.sample()->offsetMillis<<"\nclock_roundtrip_ms="<<clock.sample()->roundTripMillis<<'\n';
   for(int i=0;i<3;++i)f<<"event"<<i<<"_reads="<<reads[i]<<"\nevent"<<i<<"_failures="<<failures[i]<<"\nevent"<<i<<"_checked="<<coordinator.records[i].checked<<"\nevent"<<i<<"_verified="<<coordinator.records[i].verified<<"\nevent"<<i<<"_due="<<coordinator.requests[i].due<<'\n';
  }
  HICON makeIcon(){
@@ -64,7 +69,7 @@ class App {
   trayIcon=static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(1),IMAGE_ICON,32,32,0));if(!trayIcon)trayIcon=makeIcon();tray.cbSize=sizeof(tray);tray.hWnd=display;tray.uID=1;tray.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;tray.uCallbackMessage=TrayMessage;tray.hIcon=trayIcon;wcscpy_s(tray.szTip,L"Sanctuary Timers");Shell_NotifyIconW(NIM_ADD,&tray);
   focusHook=SetWinEventHook(EVENT_SYSTEM_FOREGROUND,EVENT_SYSTEM_FOREGROUND,nullptr,windowEvent,0,0,WINEVENT_OUTOFCONTEXT|WINEVENT_SKIPOWNPROCESS);
   if(!focusHook){log("foreground hook unavailable");return false;}
-  log("started; no-activate display and event-driven tracking");focus(GetForegroundWindow());return true;
+  log("started; no-activate display and event-driven tracking");focus(GetForegroundWindow());scheduleClock();return true;
  }
  void hooks(){
   if(locationHook)UnhookWinEvent(locationHook);if(destroyHook)UnhookWinEvent(destroyHook);
@@ -77,7 +82,7 @@ class App {
   // Verify the current foreground window, rather than trusting a queued historical event.
   hwnd=GetForegroundWindow();DWORD pid{};GetWindowThreadProcessId(hwnd,&pid);if(pid==GetCurrentProcessId())return;
   if(isGameWindow(hwnd)){
-   bool newSession=pid!=gamePid;game=hwnd;gamePid=pid;if(newSession)hooks();editing=false;active=true;visible=true;coordinator.activate(utcNow(),newSession);position();paint();ShowWindow(display,SW_SHOWNOACTIVATE);ShowWindow(input,SW_SHOWNOACTIVATE);schedule();log(newSession?"game session active":"game foreground");
+   bool newSession=pid!=gamePid;game=hwnd;gamePid=pid;if(newSession)hooks();editing=false;active=true;visible=true;coordinator.activate(now(),newSession);position();paint();ShowWindow(display,SW_SHOWNOACTIVATE);ShowWindow(input,SW_SHOWNOACTIVATE);schedule();log(newSession?"game session active":"game foreground");
   }else {editing=false;hide();log("hidden; game not foreground");}
  }
  void position(){
@@ -89,13 +94,28 @@ class App {
   SetWindowPos(display,HWND_TOPMOST,bounds.x,bounds.y,bounds.width,bounds.height,SWP_NOACTIVATE);
   SetWindowPos(input,HWND_TOPMOST,bounds.x,bounds.y,inputWidth,bounds.height,SWP_NOACTIVATE);
  }
- void paint(){if(!visible&&!smoke)return;++paints;if(!renderer.draw(display,prefs,settings,coordinator.records,utcNow(),scale,bounds,status)){++paintErrors;if(paintErrors<5)log("layered drawing failed: "+std::to_string(GetLastError()));}}
+ void paint(){if(!visible&&!smoke)return;++paints;if(!renderer.draw(display,prefs,settings,coordinator.records,now(),scale,bounds,status,clock.summary(GetTickCount64()))){++paintErrors;if(paintErrors<5)log("layered drawing failed: "+std::to_string(GetLastError()));}}
+ void armPaint(){if(visible&&(settings||!prefs.collapsed))SetTimer(display,PaintTimer,static_cast<UINT>(std::clamp<Millis>(1000-nowMillis()%1000,15,1000)),nullptr);}
+ void scheduleClock(){
+  KillTimer(display,ClockTimer);if(smoke||!running)return;
+  if(!clockWorker.joinable()&&clock.takeDue(GetTickCount64())){
+   clockWorker=std::thread([this]{auto result=std::make_unique<ClockResponse>(fetchClock(&running));if(PostMessageW(display,ClockMessage,0,reinterpret_cast<LPARAM>(result.get())))result.release();});
+  }
+  SetTimer(display,ClockTimer,static_cast<UINT>(std::clamp<Millis>(clock.untilDue(GetTickCount64()),1,2147483000)),nullptr);
+ }
+ void clockData(ClockResponse* raw){
+  std::unique_ptr<ClockResponse> response(raw);if(clockWorker.joinable())clockWorker.join();++clockReads;
+  clock.finish(response->sample,GetTickCount64());
+  if(response->sample)log("clock synced source=time.windows.com offset_ms="+std::to_string(response->sample->offsetMillis)+" roundtrip_ms="+std::to_string(response->sample->roundTripMillis)+" next_check_seconds=86400");
+  else log("clock sync failed: "+response->error);
+  scheduleClock();schedule();paint();dump();
+ }
  void schedule(){
-  coordinator.observeClock(utcNow(),GetTickCount64());
+  coordinator.observeClock(now(),GetTickCount64());
   KillTimer(display,PaintTimer);KillTimer(display,NetworkTimer);
-  if(visible&&!prefs.collapsed)SetTimer(display,PaintTimer,1000,nullptr);
+  armPaint();
   if(!active)return;
-  auto now=utcNow();coordinator.reconcile(now);auto due=coordinator.nextWake(now);
+  auto now=this->now();coordinator.reconcile(now);auto due=coordinator.nextWake(now);
   if(due!=Never)SetTimer(display,NetworkTimer,static_cast<UINT>(std::clamp<Time>((due-now)*1000,1,2147483000)),nullptr);
   startRequests(now);
  }
@@ -103,14 +123,15 @@ class App {
   if(worker.joinable())return;
   int mask=coordinator.takeDue(now,active);if(!mask)return;
   status=L"Checking event times…";
-  worker=std::thread([this,mask]{
+  auto eventClock=clock;
+  worker=std::thread([this,mask,eventClock]{
    auto result=std::make_unique<Batch>();result->requested=mask;
-   for(int i=0;i<3;++i)if(mask&(1<<i)){if(!active)break;result->performed|=1<<i;result->response[i]=fetchRecord(Kind(i),utcNow(),&active);}
+   for(int i=0;i<3;++i)if(mask&(1<<i)){if(!active)break;result->performed|=1<<i;result->response[i]=fetchRecord(Kind(i),eventClock.now(utcMillis(),GetTickCount64())/1000,&active);}
    if(PostMessageW(display,DataMessage,0,reinterpret_cast<LPARAM>(result.get())))result.release();
   });
  }
  void data(Batch* raw){
-  std::unique_ptr<Batch> result(raw);if(worker.joinable())worker.join();bool all=true;auto now=utcNow();
+  std::unique_ptr<Batch> result(raw);if(worker.joinable())worker.join();bool all=true;auto now=this->now();
   for(int i=0;i<3;++i)if(result->requested&(1<<i)){
    if(!(result->performed&(1<<i))||result->response[i].error=="cancelled"){coordinator.requests[i].busy=false;continue;}
    ++reads[i];auto& response=result->response[i];bool ok=response.record&&acceptRecord(Kind(i),coordinator.records[i],*response.record);
@@ -155,12 +176,14 @@ class App {
    case FocusMessage:a->focus(reinterpret_cast<HWND>(l));return 0;
    case LocationMessage:if(reinterpret_cast<HWND>(l)==a->game){if(w==EVENT_OBJECT_DESTROY||IsIconic(a->game)){a->hide();}else if(a->visible){a->position();a->paint();}}return 0;
    case DataMessage:a->data(reinterpret_cast<Batch*>(l));return 0;
+   case ClockMessage:a->clockData(reinterpret_cast<ClockResponse*>(l));return 0;
    case StatusMessage:a->dump();return 0;
    case SnapshotMessage:a->renderer.saveBitmap((a->directory/L"preview.bmp").wstring());return 0;
    case WM_TIMER:
-    if(w==PaintTimer){if(a->coordinator.observeClock(utcNow(),GetTickCount64()))a->schedule();a->paint();}
-    else if(w==NetworkTimer){KillTimer(hwnd,NetworkTimer);a->schedule();}return 0;
-   case WM_TIMECHANGE:case WM_POWERBROADCAST:if(message==WM_TIMECHANGE||w==PBT_APMRESUMEAUTOMATIC||w==PBT_APMRESUMESUSPEND){a->coordinator.observeClock(utcNow(),GetTickCount64());a->coordinator.activate(utcNow(),true);a->focus(GetForegroundWindow());}return TRUE;
+    if(w==PaintTimer){KillTimer(hwnd,PaintTimer);if(a->coordinator.observeClock(a->now(),GetTickCount64()))a->schedule();a->paint();a->armPaint();}
+    else if(w==NetworkTimer){KillTimer(hwnd,NetworkTimer);a->schedule();}
+    else if(w==ClockTimer)a->scheduleClock();return 0;
+   case WM_TIMECHANGE:case WM_POWERBROADCAST:if(message==WM_TIMECHANGE||w==PBT_APMRESUMEAUTOMATIC||w==PBT_APMRESUMESUSPEND){a->coordinator.observeClock(a->now(),GetTickCount64());a->coordinator.activate(a->now(),true);a->focus(GetForegroundWindow());a->scheduleClock();}return TRUE;
    case WM_DPICHANGED:case WM_DISPLAYCHANGE:if(a->visible){a->position();a->paint();}return 0;
    case WM_LBUTTONDOWN:if(hwnd==a->input)a->click(static_cast<int>(GET_X_LPARAM(l)/a->scale),static_cast<int>(GET_Y_LPARAM(l)/a->scale));return 0;
    case WM_MOUSEMOVE:if(a->dragging){POINT p{};GetCursorPos(&p);a->prefs.x=std::max(0,a->dragX+static_cast<int>((p.x-a->dragStart.x)/a->scale));a->prefs.y=std::max(0,a->dragY+static_cast<int>((p.y-a->dragStart.y)/a->scale));a->position();a->paint();}return 0;
@@ -203,8 +226,9 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR args,int){
   }else{
    MSG msg{};while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}
   }
-  app.active=false;if(app.worker.joinable())app.worker.join();
+  app.active=false;app.running=false;if(app.worker.joinable())app.worker.join();if(app.clockWorker.joinable())app.clockWorker.join();
   MSG pending{};while(PeekMessageW(&pending,app.display,DataMessage,DataMessage,PM_REMOVE))delete reinterpret_cast<Batch*>(pending.lParam);
+  while(PeekMessageW(&pending,app.display,ClockMessage,ClockMessage,PM_REMOVE))delete reinterpret_cast<ClockResponse*>(pending.lParam);
   appWindow=nullptr;if(app.input)DestroyWindow(app.input);if(app.display)DestroyWindow(app.display);
  }
  CoUninitialize();CloseHandle(mutex);return result;

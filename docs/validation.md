@@ -18,6 +18,10 @@ Core behavior and review regressions were exercised as failing tests before thei
 
 ## Limits
 
+Daily clock synchronization, September 26 (0.1.3): 11 new clock cases cover forward/backward correction, latency compensation, reply validation/replay rejection, the 2036 NTP era rollover, exactly 24-hour scheduling, duplicate suppression, sleep/system-clock changes and capped retries retaining the last correction. All 29 existing core cases, platform and rendering suites passed locally. The renderer checks the new status text at minimum settings width and draws the expanded panel offscreen at 150% scaling. All 14 Windows PowerShell 5.1 installer tests passed.
+
+A read-only native live time probe received a valid Microsoft SNTP response with a -369 ms local-clock correction and 15 ms round trip. The initial DNS implementation was rejected by Windows; using its asynchronous lookup API enabled the bounded timeout and passed the live probe. The daily interval is exercised with injected timestamps, not by shortening the production interval or advancing Windows time. A full 24-hour live cycle has not yet been observed.
+
 Typography refinement, September 25: a regression check initially failed because the renderer returned Segoe UI. After embedding PT Serif, tests verified the actual private font collection, real regular/bold faces without synthetic weights, and actual label/countdown metrics at all 12 supported sizes. The complete core/platform/renderer suites passed before application replacement. The original executable size above describes the initial sans-serif build; embedding the two font faces adds approximately 683 KiB. Initial performance observations above predate this typography refinement.
 
 The revised executable is 1,678,336 bytes. Its offscreen smoke check passed without focus change, and it replaced the running overlay while preserving the existing settings file byte-for-byte. [Independent MSVC CI](https://github.com/ihor-sokoliuk/sanctuary-timers/actions/runs/36194895074) passed the new font checks and all other suites. The preview image shows the updated serif rendering.

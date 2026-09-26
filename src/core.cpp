@@ -151,7 +151,7 @@ static int timerColumnWidth(int font){return (font*564+99)/100+1;}
 Preferences normalize(Preferences p) {p.font=std::clamp(p.font,11,22);p.width=std::clamp(p.width,75+(p.font*533+99)/100+timerColumnWidth(p.font),560);p.opacity=std::clamp(p.opacity,10,100);p.x=std::clamp(p.x,0,16000);p.y=std::clamp(p.y,0,16000);return p;}
 Box place(Box game,int width,int height,int x,int y) {width=std::max(1,std::min(width,game.width));height=std::max(1,std::min(height,game.height));return {game.x+std::clamp(x,0,game.width-width),game.y+std::clamp(y,0,game.height-height),width,height};}
 StartupAction startupAction(bool registered,bool exists,bool samePath) {if(!exists)return registered?StartupAction::None:StartupAction::Create;return samePath?StartupAction::None:StartupAction::Update;}
-Layout layout(Preferences p,bool settings) {p=normalize(p);int row=std::max(24,p.font+12);int width=settings?std::max(320,p.width):p.collapsed?28:p.width;int timeWidth=timerColumnWidth(p.font);return {width,settings?246:row*3+8,28,row,timeWidth,width-58-timeWidth-16};}
+Layout layout(Preferences p,bool settings) {p=normalize(p);int row=std::max(24,p.font+12);int width=settings?std::max(320,p.width):p.collapsed?28:p.width;int timeWidth=timerColumnWidth(p.font);return {width,settings?267:row*3+8,28,row,timeWidth,width-58-timeWidth-16};}
 Hit hitTest(Preferences p,bool settings,int x,int y) {
  auto l=layout(p,settings);if(x<0||y<0||x>=l.width||y>=l.height)return Hit::None;
  if(settings){if(y<32)return Hit::Back;for(int i=0;i<3;++i)if(y>=42+i*40&&y<74+i*40){if(x>=l.width-82&&x<l.width-48)return Hit(int(Hit::FontDown)+i*2);if(x>=l.width-42)return Hit(int(Hit::FontUp)+i*2);}return Hit::None;}

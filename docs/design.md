@@ -30,6 +30,12 @@ Render countdowns at most once per second while visible. Suspend redraws while h
 
 All scheduling uses UTC timestamps. Countdown values are recomputed from absolute time; they are not a counter decremented indefinitely. A monotonic timer drives repaint/wakeups, and wall-clock or sleep/resume changes trigger recalculation.
 
+As of 0.1.3, a separate SNTP check to `time.windows.com` runs at application launch and every 24 hours. It anchors application UTC to a monotonic clock, avoiding later Windows clock adjustments changing the countdown. The daily timer also runs while the game is closed; resume catches up on an overdue check without replaying missed days. Event fetches keep their existing foreground/boundary policy. The display timer aligns redraws with corrected second boundaries.
+
+Clock checks run off the UI thread, with a bounded asynchronous DNS lookup and two-second response deadline. Connected UDP restricts the peer; the parser checks request correlation, version/mode, leap/stratum, nonzero/ordered timestamps, latency, wall-clock changes during the exchange, and a maximum five-minute correction. Delay compensation follows the four timestamps in [SNTP RFC 4330 section 5](https://www.rfc-editor.org/rfc/rfc4330.html#section-5). It is ordinary SNTP, not authenticated NTS. No received value changes the Windows system clock.
+
+A failed clock check retains the last in-process anchor and retries after 15 minutes, doubling up to six hours. Before first success, use Windows UTC. Appearance distinguishes clock status from the oldest event-record check; diagnostic status includes the sample offset, round trip and next check. Clock anchors are not persisted across process restarts, so an old correction cannot be reapplied after Windows has adjusted its clock.
+
 | Event | Documented rule | Live Helltides evidence collected September 25 |
 |---|---|---|
 | Helltide | Starts at the top of each UTC hour; active for 55 minutes, followed by a five-minute break | Start 20:00 UTC; end 20:55 UTC |

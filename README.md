@@ -15,7 +15,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-Sanct
 
 The installer downloads the latest stable release, verifies its SHA-256 checksum, and installs it into `%LOCALAPPDATA%\Programs\SanctuaryTimers`. It adds a Start menu entry and an entry under Windows Installed apps. An on-demand Task Scheduler task launches it independently of the installer, terminal, or Codex. No administrator password is needed.
 
-Automatic startup remains under **Task Manager > Startup apps > Sanctuary Timers**. The task has no automatic triggers, so disabling startup in Task Manager is respected. Existing settings and cache survive updates. To move a previous portable copy, add `-MigrateFrom 'C:\path\to\portable-folder'`; use `-Version 0.1.2` to select a release or `-NoStart` to install without launching it.
+Automatic startup remains under **Task Manager > Startup apps > Sanctuary Timers**. The task has no automatic triggers, so disabling startup in Task Manager is respected. Existing settings and cache survive updates. To move a previous portable copy, add `-MigrateFrom 'C:\path\to\portable-folder'`; use `-Version 0.1.3` to select a release or `-NoStart` to install without launching it.
 
 Run the installer again to update. Uninstall through Windows Installed apps, or run the installed script with `-Uninstall`. Uninstall preserves preferences/cache and an ownership marker, allowing a later reinstall. Failed updates retain `SanctuaryTimers.previous.exe` for recovery; if rollback cannot finish, the installer reports that path.
 
@@ -43,7 +43,11 @@ Right-click the tray icon to open appearance settings or exit. Starting it a sec
 
 ## Timing and network behavior
 
-The app fetches three small public records used by Helltides.com. It calculates countdowns locally, then checks the affected event 20 seconds after a known start/end. It does not refresh all events every five minutes. Requests are deferred while the game is not foreground. Failures retain cached anchors and back off from one minute to thirty minutes, honoring server retry delays.
+The overlay checks its clock against `time.windows.com` at launch and then every 24 hours, including while the game is closed. It compensates for network delay and keeps time locally between checks. Corrections apply only to this app; no administrator rights or Windows time-setting changes are needed. An overdue check runs after wake. If a check fails, the previous correction remains in use (or Windows time before the first success), with retries starting after 15 minutes and backing off to six hours. Restarting the app starts a fresh clock check.
+
+Appearance shows **Clock: synced ... (daily)** separately from **Events checked**. Event-check age is the oldest successful event-record read, not the clock's age. Clock synchronization needs outbound UDP port 123; a blocked connection is shown as a pending retry.
+
+The app fetches three small public records used by Helltides.com. It calculates countdowns locally, then checks the affected event 20 seconds after a known start/end. It does not refresh all events every five minutes. Event requests are deferred while the game is not foreground. Failures retain cached anchors and back off from one minute to thirty minutes, honoring server retry delays.
 
 Helltides follow the hourly 55-minute cycle. World Boss and Legion calculations use validated feed anchors and 210-minute/25-minute intervals. A changed source phase suspends extrapolation until reconfirmed. These are website feeds, not a guaranteed Blizzard API; changes can require an adapter update.
 
@@ -70,7 +74,7 @@ ctest --test-dir build-msvc -C Release --output-on-failure
 
 ## Implementation and privacy
 
-The source uses C++20, Win32, Direct2D/DirectWrite and WinHTTP. Window focus/location changes arrive through out-of-context WinEvent notifications. The application does not read game memory, inject code, capture the game, or automate gameplay. There is no telemetry or update checker. `settings.ini`, `events.ini`, `diagnostics.log` and an on-demand `status.txt` remain beside the executable.
+The source uses C++20, Win32, Direct2D/DirectWrite, WinHTTP and Windows Sockets for SNTP time checks. Window focus/location changes arrive through out-of-context WinEvent notifications. The application does not read game memory, inject code, capture the game, or automate gameplay. There is no telemetry or update checker. `settings.ini`, `events.ini`, `diagnostics.log` and an on-demand `status.txt` remain beside the executable.
 
 The display uses a click-through drawing surface and a tightly aligned input surface entirely within its bounds, so gameplay clicks can pass through to another process reliably. They appear as one panel and never activate themselves.
 

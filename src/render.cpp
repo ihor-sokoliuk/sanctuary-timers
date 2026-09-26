@@ -52,7 +52,7 @@ void Renderer::icon(int i,float x,float y,unsigned rgb){
  else if(i==1){ID2D1PathGeometry* path{};if(SUCCEEDED(factory_->CreatePathGeometry(&path))){ID2D1GeometrySink* sink{};if(SUCCEEDED(path->Open(&sink))){sink->BeginFigure(D2D1::Point2F(x,y-8),D2D1_FIGURE_BEGIN_FILLED);sink->AddBezier(D2D1::BezierSegment(D2D1::Point2F(x+1,y-1),D2D1::Point2F(x+9,y),D2D1::Point2F(x+5,y+6)));sink->AddBezier(D2D1::BezierSegment(D2D1::Point2F(x+1,y+10),D2D1::Point2F(x-8,y+6),D2D1::Point2F(x-5,y)));sink->AddLine(D2D1::Point2F(x-3,y-4));sink->AddLine(D2D1::Point2F(x-2,y));sink->EndFigure(D2D1_FIGURE_END_CLOSED);sink->Close();target_->FillGeometry(path,brush_);sink->Release();}path->Release();}}
  else {line(x-6,y-7,x+5,y+6,rgb,2);line(x+6,y-7,x-5,y+6,rgb,2);line(x-7,y+3,x-2,y+7,rgb,1.5f);line(x+7,y+3,x+2,y+7,rgb,1.5f);}
 }
-bool Renderer::draw(HWND hwnd,Preferences p,bool settings,const std::array<Record,3>& records,Time now,float scale,Box bounds,const std::wstring& status){
+bool Renderer::draw(HWND hwnd,Preferences p,bool settings,const std::array<Record,3>& records,Time now,float scale,Box bounds,const std::wstring& status,const std::wstring& clockStatus){
  if(bounds.width<1||bounds.height<1)return false;if(!target_&&!createTarget())return false;
  if(width_!=bounds.width||height_!=bounds.height){
   if(bitmap_){SelectObject(dc_,old_);DeleteObject(bitmap_);bitmap_=nullptr;}
@@ -74,8 +74,9 @@ bool Renderer::draw(HWND hwnd,Preferences p,bool settings,const std::array<Recor
   }
   text(status,14,169,w-28,25,11,0xb0bac9);
   Time checked=0;for(const auto& r:records)if(r.checked&&(checked==0||r.checked<checked))checked=r.checked;
-  auto last=checked?L"Last check: "+std::to_wstring(std::max<Time>(0,now-checked)/60)+L" min ago":L"Waiting for first sync";
-  text(last,14,194,w-28,21,11,0xb0bac9);text(L"Startup: managed in Task Manager",14,215,w-28,21,10,0x8995a7);
+  auto last=checked?L"Events checked: "+std::to_wstring(std::max<Time>(0,now-checked)/60)+L" min ago":L"Events: waiting for first sync";
+  text(last,14,194,w-28,21,11,0xb0bac9);text(clockStatus,14,215,w-28,21,11,0xb0bac9);
+  text(L"Startup: managed in Task Manager",14,236,w-28,21,10,0x8995a7);
  }else{
   if(!p.collapsed)line(28,8,28,h-8,0x394252);
   text(p.collapsed?L"›":L"‹",9,0,18,27,20,0xe8c3ae);

@@ -5,7 +5,7 @@
 #include <vector>
 using namespace sanctuary;
 #define REQUIRE(v) if(!(v)){std::cerr<<"FAIL line "<<__LINE__<<": "<<#v<<'\n';return 1;}
-int main(){
+int main(int argc,char** argv){
  auto foreground=GetForegroundWindow();
  auto hwnd=CreateWindowExW(WS_EX_LAYERED|WS_EX_NOACTIVATE|WS_EX_TOOLWINDOW,L"STATIC",L"Sanctuary renderer test",WS_POPUP,0,0,1,1,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
  REQUIRE(hwnd);
@@ -37,6 +37,11 @@ int main(){
   f->Release();std::array<Record,3> records{};
   REQUIRE(r.draw(hwnd,p,false,records,1790366400,1.f,{0,0,l.width,l.height},L"Offline estimates"));
  }
+ for(auto message:{L"Clock: synced 1440 min ago (daily)",L"Clock: Windows; retry pending",L"Clock: cached; retry pending",L"Events checked: 99999 min ago"}){
+  IDWriteTextFormat* format{};REQUIRE(SUCCEEDED(r.createTextFormat(11,true,&format)));
+  IDWriteTextLayout* text{};REQUIRE(SUCCEEDED(factory->CreateTextLayout(message,static_cast<UINT32>(wcslen(message)),format,1000,1000,&text)));
+  DWRITE_TEXT_METRICS metrics{};REQUIRE(SUCCEEDED(text->GetMetrics(&metrics)));REQUIRE(metrics.widthIncludingTrailingWhitespace+1<=layout({15,241,75},true).width-28);text->Release();format->Release();
+ }
  factory->Release();
  r.discardDeviceResources();
  Preferences p{13,270,10};auto l=layout(p,false);
@@ -47,6 +52,9 @@ int main(){
  unsigned maxAlpha=0;for(size_t i=57;i<bytes.size();i+=4)maxAlpha=std::max(maxAlpha,unsigned(bytes[i]));
  auto backgroundAlpha=bytes[54+(15*270+140)*4+3];REQUIRE(maxAlpha>=250&&backgroundAlpha>=20&&backgroundAlpha<=32);
  std::filesystem::remove(path);
+ auto settingsLayout=layout({15,241,75},true);
+ REQUIRE(r.draw(hwnd,{15,241,75},true,{},1790366400,1.5f,{0,0,settingsLayout.width*3/2,settingsLayout.height*3/2},L"Timers calculated locally",L"Clock: synced 1440 min ago (daily)"));
+ if(argc==2)REQUIRE(r.saveBitmap(std::filesystem::path(argv[1]).wstring()));
  REQUIRE(!IsWindowVisible(hwnd));REQUIRE(GetForegroundWindow()==foreground);DestroyWindow(hwnd);
  std::cout<<"PASS renderer: embedded PT Serif regular/bold without fallback, compact minimum widths at 12 font sizes, text metrics, transparent background with opaque text, resource recreation, hidden/no-activate\n";
 }

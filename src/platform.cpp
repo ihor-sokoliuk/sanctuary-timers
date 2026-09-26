@@ -28,7 +28,8 @@ struct Internet {
  operator HINTERNET()const{return h;}
 };
 }
-Time utcNow(){return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();}
+Millis utcMillis(){return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();}
+Time utcNow(){return utcMillis()/1000;}
 Preferences loadPreferences(const std::filesystem::path& path){
  Preferences p;
  auto read=[&](const wchar_t* key,int fallback){return static_cast<int>(std::clamp<Time>(number(path,L"appearance",key,fallback),-100000,100000));};

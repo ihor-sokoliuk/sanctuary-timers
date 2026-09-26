@@ -20,7 +20,7 @@ class Renderer {
  bool init();
  HRESULT createTextFormat(float size,bool bold,IDWriteTextFormat** format);
  void discardDeviceResources();
- bool draw(HWND,Preferences,bool settings,const std::array<Record,3>&,Time now,float scale,Box bounds,const std::wstring& status);
+ bool draw(HWND,Preferences,bool settings,const std::array<Record,3>&,Time now,float scale,Box bounds,const std::wstring& status,const std::wstring& clockStatus=L"Clock: waiting for sync");
  bool saveBitmap(const std::wstring&) const;
 };
 }
