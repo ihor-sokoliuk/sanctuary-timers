@@ -46,3 +46,15 @@ The published installer updated the managed installation using Windows PowerShel
 The new Windows-owned process completed its first clock check while Diablo was not foreground: one successful SNTP exchange, -376 ms correction, 42 ms round trip, and next check scheduled for 86,400 seconds. Event fetches remained deferred. A later status request confirmed the same process, still only one clock request, and a decreasing daily deadline. Preferences, the quoted autostart path, Task Manager metadata and all unrelated startup values were preserved. The installer exited before these checks; the application remained responsive. No Windows time settings or foreground window were changed.
 
 Appearance text/layout was verified by offscreen rendering at 150% scaling. This deployment did not force a game focus change, sign-in/reboot, or a 24-hour live wait; injected-time tests cover the daily boundary and sleep catch-up.
+
+## Cached event colors: 0.1.4
+
+The user gave standing authorization to publish and install future changes to this project automatically. The repository's `AGENTS.md` records that instruction and the existing verification and foreground-preservation requirements.
+
+Version [0.1.4](https://github.com/ihor-sokoliuk/sanctuary-timers/releases/tag/v0.1.4) was published from `b6ae413c34ab7ae8681b2c9d07760f8a72be9079` after successful [Windows CI](https://github.com/ihor-sokoliuk/sanctuary-timers/actions/runs/36248135735). The four native suites, including the new event-color pixel checks, and Windows PowerShell 5.1 installer suite passed. Release assets came from that exact CI run; archive paths, contents and SHA-256 checks were verified before publication.
+
+The published installer updated the managed local copy using Windows PowerShell 5.1. The installed version reports 0.1.4 and exactly matches the executable inside the release ZIP: SHA-256 `A4976D197702EBD9C053704707396B7752B32CD629E4EB5F94F5572C1EAA2EF3`. The previous 0.1.3 executable remains intact for rollback.
+
+Passive checks confirmed one responsive overlay process owned by the Windows Schedule service, surviving the completed installer with no Codex or PowerShell ancestor. Preferences and event cache were byte-for-byte unchanged; the quoted Run path, Task Manager startup metadata and all seven unrelated Run values were preserved. The on-demand task still has no automatic triggers or execution time limit. Startup, Start menu and Installed apps registration passed verification.
+
+The first daily clock check succeeded with a -404 ms correction and 41 ms round trip. A later fresh status showed the same process, one clock request, no clock failures and a decreasing 24-hour deadline. Diablo was not foreground, so event requests and painting remained suspended. The foreground process was unchanged across installation; no input was synthesized. Colors were verified with offscreen rendering in both local and CI builds, not by forcing the live game into the foreground. No sign-in/reboot or full-day wait was performed.
