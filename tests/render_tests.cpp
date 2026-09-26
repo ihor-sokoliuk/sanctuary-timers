@@ -28,7 +28,7 @@ int main(){
   f->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
   for(auto s:{L"ends ~55:00",L"ends ~88:88",L"ends ~00:00",L"~23:59:59",L"~Now",L"in ~05:00",L"World Boss",L"Helltide",L"Legion"}){
    bool label=s[0]==L'W'||s[0]==L'H'||s[0]==L'L';
-   IDWriteTextFormat* actualFormat{};REQUIRE(SUCCEEDED(r.createTextFormat(static_cast<float>(size),!label,&actualFormat)));
+   IDWriteTextFormat* actualFormat{};REQUIRE(SUCCEEDED(r.createTextFormat(static_cast<float>(size),true,&actualFormat)));
    IDWriteTextLayout* text{};REQUIRE(SUCCEEDED(factory->CreateTextLayout(s,static_cast<UINT32>(wcslen(s)),actualFormat,1000,1000,&text)));
    DWRITE_TEXT_METRICS m{};REQUIRE(SUCCEEDED(text->GetMetrics(&m)));int available=label?l.labelWidth:l.timeWidth;
    if(m.widthIncludingTrailingWhitespace+1>available)std::wcerr<<L"Clipped at "<<size<<L" px: "<<s<<L" needs "<<m.widthIncludingTrailingWhitespace+1<<L", has "<<available<<'\n';

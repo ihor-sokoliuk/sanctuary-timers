@@ -10,7 +10,7 @@ Place `SanctuaryTimers.exe` in a writable folder you intend to keep, then run it
 
 The left strip contains collapse/expand, drag, and settings. The timer area lets clicks pass to the game. Settings open inside the panel: adjust text size, width, and background opacity with the minus/plus controls. Text stays opaque. Appearance and position are saved beside the executable.
 
-Labels and timers use embedded PT Serif lettering with a subtle dark shadow to match the game's serif UI style. No system font installation is needed.
+All text, including event names, timers and appearance settings, uses embedded PT Serif Bold with a subtle dark shadow to match the game's serif UI style. No system font installation is needed.
 
 Each event name matches its countdown color: red for World Boss, orange for Helltide, and blue-gray for Legion. Estimated/offline names and countdowns share the muted estimate color.
 

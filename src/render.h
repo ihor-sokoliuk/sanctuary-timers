@@ -12,7 +12,7 @@ class Renderer {
  bool createTarget();
  bool loadFonts();
  void color(unsigned rgb,float alpha=1);
- void text(const std::wstring&,float x,float y,float w,float h,float size,unsigned rgb,bool right=false,bool bold=false);
+ void text(const std::wstring&,float x,float y,float w,float h,float size,unsigned rgb,bool right=false,bool bold=true);
  void line(float x1,float y1,float x2,float y2,unsigned rgb,float width=1);
  void icon(int,float,float,unsigned);
  public:

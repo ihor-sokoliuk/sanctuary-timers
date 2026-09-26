@@ -14,7 +14,7 @@ Boss names and locations are omitted. The product has no maps, outbound event li
 
 The initial target is approximately 270 by 82 logical pixels at 13-pixel text. Actual native dimensions are subject to font metrics and Windows display scaling. Text size, width, and background opacity are adjustable. Larger text expands the minimum width so labels and times remain readable. Long countdowns use compact hours/minutes/seconds. Text remains legible independently of background transparency.
 
-The September 25 typography refinement uses embedded PT Serif regular for labels and bold for countdowns, with a subtle dark shadow, following the user's in-game screenshot. Fonts load privately from executable resources; no Windows font installation is required.
+The September 25 typography refinement uses embedded PT Serif Bold for all text, including event names, countdowns and settings, with a subtle dark shadow, following the user's in-game screenshot. Fonts load privately from executable resources; no Windows font installation is required.
 
 The width control adjusts in 5-pixel increments. The lower bound reserves the embedded font's tested label/timer widths and an 8-pixel column gap, rather than the original oversized countdown column. At 15-pixel text it permits a 241-pixel panel, bringing the visible name-to-time gap to roughly half its previous size. The settings view keeps enough width for its own controls.
 
